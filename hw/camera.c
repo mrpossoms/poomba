@@ -177,7 +177,7 @@ int cam_config(int fd, cam_settings_t* cfg)
 	// }
 
 	format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+	format.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24;
 	format.fmt.pix.width = cfg->width;
 	format.fmt.pix.height = cfg->height;
 
