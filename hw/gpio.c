@@ -35,6 +35,7 @@ int hwd_gpio_set(int pin, int state)
 	}
 		
 	snprintf(buf, sizeof(buf), "echo %d > /sys/class/gpio/gpio%d/value", state, pin);
+	system(buf);
 
 	return 0;
 }
