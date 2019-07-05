@@ -10,7 +10,7 @@ bin:
 	mkdir bin
 
 obj: bin
-	mkdir obj
+	mkdir -p obj
 
 .PHONY: %.c
 %.c:
