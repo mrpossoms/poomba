@@ -18,12 +18,16 @@ typedef union {
 		uint8_t r, g, b;
 	};
 	uint8_t v[3];
-} rgb_t;
+} rgb_t __attribute__ ((packed));
 
 typedef struct {
 	rgb_t pixels[CAM_HEIGHT][CAM_WIDTH];
-} frame_t;
+} frame_t __attribute__ ((packed));
 
+typedef struct {
+	char magic[4];
+	int32_t width, height, depth;
+} hdr_t __attribute__ ((packed));
 
 int request_classification(const char* host_name, frame_t* frame, uint32_t* is_ok)
 {
@@ -47,8 +51,17 @@ int request_classification(const char* host_name, frame_t* frame, uint32_t* is_o
 	res = connect(sock, (struct sockaddr*)&host_addr, sizeof(host_addr));
 	if (res < 0) { goto abort; }
 
+	// send the header
+	hdr_t hdr = {
+		.magic = "POOP",
+		.width = CAM_WIDTH,
+		.height = CAM_HEIGHT,
+		.depth = 3,
+	};
+	if (write(sock, &hdr, sizeof(hdr_t)) != sizeof(hdr_t)) { res = -3; goto abort; }
+
 	// send the frame
-	if (write(sock, frame, sizeof(frame_t)) != sizeof(frame_t)) { res = -3; goto abort; }
+	if (write(sock, frame, sizeof(frame_t)) != sizeof(frame_t)) { res = -4; goto abort; }
 
 	// wait, and read back the classification
 	if (read(sock, is_ok, sizeof(uint32_t)) != sizeof(uint32_t))
@@ -81,7 +94,7 @@ int main (int argc, const char* argv[])
 		cam_wait_frame(&cam);
 		get_frame(&cam, &last_frame);
 
-		int is_ok = 0;
+		uint32_t is_ok = 0;
 		request_classification("127.0.0.1", &last_frame, &is_ok);
 		hwd_gpio_set(4, is_ok);
 	}

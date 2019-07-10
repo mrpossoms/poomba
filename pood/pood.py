@@ -5,7 +5,10 @@ from socketserver import BaseRequestHandler
 from PIL import Image
 import numpy as np
 import struct
+import time
+from classifier import Classifier
 
+classifier = Classifier(1024, 768, 3)
 
 def array_from_file(path):
     from PIL import Image
@@ -17,6 +20,7 @@ def array_from_file(path):
 
 def save_img_buffer(path, size, buf):
     Image.frombuffer('RGB', size, buf).save(path, 'PNG')
+
 
 class ClassifyReqHandler(BaseRequestHandler):
     def __init__(self):
@@ -30,13 +34,14 @@ class ClassifyReqHandler(BaseRequestHandler):
         hdr_buf = req.recv(struct.calcsize(hdr_fmt))
         m0, m1, m2, m3, w, h, d = struct.unpack(hdr_fmt, hdr_buf)
 
+        # make sure this message starts with the expected magic
         if (m0 + m1 + m2 + m3) is not 'POOP':
             req.close()
             return
 
         # the request is good, read the frame
         frame = req.recv(w * h * d)
-        save_img_buffer('/var/poomba/ds/')
+        save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
 
         # do classification here
 
