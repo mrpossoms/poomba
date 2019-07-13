@@ -92,20 +92,39 @@ void get_frame(cam_t const* cam, frame_t* frame)
 }
 
 
+unsigned int frame_diff(frame_t* f0, frame_t* f1)
+{
+	unsigned int diff = 0;
+	for (int r = 0; r < CAM_HEIGHT; ++r)
+	for (int c = 0; c < CAM_WIDTH; ++c)
+	{
+		diff += abs(f0->pixels[r][c].r - f1->pixels[r][c].r);
+	}
+
+	return diff;
+}
+
+
 int main (int argc, const char* argv[])
 {
 	cam_settings_t cam_cfg = { CAM_WIDTH, CAM_HEIGHT, 5 };
 	cam_t cam = cam_open("/dev/video0", &cam_cfg);
-	frame_t last_frame;
-
-	while(1)
+	frame_t frames[2];
+	
+	for (unsigned int i = 0; 1; ++i)
 	{
 		cam_request_frame(&cam);
 		cam_wait_frame(&cam);
-		get_frame(&cam, &last_frame);
+		get_frame(&cam, frames + (i % 2));
+
+		if (i > 1)
+		{
+			int diff = frame_diff(frames + 0, frames + 1);
+			printf("frame_diff: %d\n", diff);
+		}
 
 		uint32_t is_ok = 0;
-		request_classification(argv[1], &last_frame, &is_ok);
+		request_classification(argv[1], frames + i, &is_ok);
 		hwd_gpio_set(4, is_ok);
 	}
 
