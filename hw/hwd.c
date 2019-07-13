@@ -62,12 +62,16 @@ int request_classification(const char* host_name, frame_t* frame, uint32_t* is_o
 	if (write(sock, &hdr, sizeof(hdr_t)) != sizeof(hdr_t)) { res = -3; goto abort; }
 
 	// send the frame
+	uint8_t* buf = (uint8_t*)frame;
 	for (size_t written = 0; written < sizeof(frame_t);)
 	{
-		int bytes = write(sock, frame + written, sizeof(frame_t) - written);
+		int bytes = write(sock, buf + written, sizeof(frame_t) - written);
 		
 		if (bytes < 0)
-		{ res = -4; goto abort; }
+		{
+			res = -4;
+			goto abort;
+		}
 
 		written += bytes;
 	}
@@ -101,30 +105,34 @@ unsigned int frame_diff(frame_t* f0, frame_t* f1)
 		diff += abs(f0->pixels[r][c].r - f1->pixels[r][c].r);
 	}
 
-	return diff;
+	return diff / (CAM_WIDTH * CAM_HEIGHT);
 }
 
 
 int main (int argc, const char* argv[])
 {
-	cam_settings_t cam_cfg = { CAM_WIDTH, CAM_HEIGHT, 5 };
+	cam_settings_t cam_cfg = { CAM_WIDTH, CAM_HEIGHT, 30 };
 	cam_t cam = cam_open("/dev/video0", &cam_cfg);
 	frame_t frames[2];
 	
 	for (unsigned int i = 0; 1; ++i)
 	{
+		int frame_idx = i % 2;
 		cam_request_frame(&cam);
 		cam_wait_frame(&cam);
-		get_frame(&cam, frames + (i % 2));
+		get_frame(&cam, frames + frame_idx);
+
+		if (i % 30) { continue; }
 
 		if (i > 1)
 		{
 			int diff = frame_diff(frames + 0, frames + 1);
-			printf("frame_diff: %d\n", diff);
+			fprintf(stderr, "frame_diff: %d\n", diff);
+			if (diff < 5) { continue; }
 		}
 
 		uint32_t is_ok = 0;
-		request_classification(argv[1], frames + i, &is_ok);
+		request_classification(argv[1], frames + frame_idx, &is_ok);
 		hwd_gpio_set(4, is_ok);
 	}
 

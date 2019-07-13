@@ -75,12 +75,15 @@ def classify_req(sock):
     while True:
         chunk = sock.recv(w * h * d - len(frame))
 
-        if len(chunk) == 0:
+        if len(chunk) == 0 and len(frame) > 0:
             break
 
         frame += chunk
 
-    save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
+    try:
+        save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
+    except:
+        pass
 
     # do classification here
 

@@ -22,7 +22,11 @@ obj/%.o: %.c obj
 hwd: $(OBJS)
 	@echo $(OBJS)
 	$(CC) $(CFLAGS) $^ -o bin/$@
-	
+
+.PHONY: install
+install:
+	ln -s $(shell pwd)/bin/hwd /usr/bin/hwd
+
 .PHONY: clean
 clean:
 	rm -rf bin obj
