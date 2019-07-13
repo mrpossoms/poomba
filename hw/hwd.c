@@ -4,14 +4,15 @@
 #include <netdb.h>
 #include <strings.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
 #include "gpio.h"
 #include "camera.h"
 
-#define CAM_WIDTH 1024
-#define CAM_HEIGHT 768
+#define CAM_WIDTH 640
+#define CAM_HEIGHT 480
 
 typedef union {
 	struct {
@@ -45,7 +46,7 @@ int request_classification(const char* host_name, frame_t* frame, uint32_t* is_o
 		(char *)&host_addr.sin_addr.s_addr,
 		host->h_length
 	);
-	host_addr.sin_port   = htons(31337);
+	host_addr.sin_port   = htons(1337);
 	host_addr.sin_family = AF_INET;
 
 	res = connect(sock, (struct sockaddr*)&host_addr, sizeof(host_addr));
@@ -61,7 +62,15 @@ int request_classification(const char* host_name, frame_t* frame, uint32_t* is_o
 	if (write(sock, &hdr, sizeof(hdr_t)) != sizeof(hdr_t)) { res = -3; goto abort; }
 
 	// send the frame
-	if (write(sock, frame, sizeof(frame_t)) != sizeof(frame_t)) { res = -4; goto abort; }
+	for (size_t written = 0; written < sizeof(frame_t);)
+	{
+		int bytes = write(sock, frame + written, sizeof(frame_t) - written);
+		
+		if (bytes < 0)
+		{ res = -4; goto abort; }
+
+		written += bytes;
+	}
 
 	// wait, and read back the classification
 	if (read(sock, is_ok, sizeof(uint32_t)) != sizeof(uint32_t))
@@ -70,6 +79,7 @@ int request_classification(const char* host_name, frame_t* frame, uint32_t* is_o
 	}
 
 abort:
+	if (res) { fprintf(stderr, "error %d: %s\n", res, strerror(errno)); }
 	close(sock);
 	return res;
 }
@@ -95,7 +105,7 @@ int main (int argc, const char* argv[])
 		get_frame(&cam, &last_frame);
 
 		uint32_t is_ok = 0;
-		request_classification("127.0.0.1", &last_frame, &is_ok);
+		request_classification(argv[1], &last_frame, &is_ok);
 		hwd_gpio_set(4, is_ok);
 	}
 
