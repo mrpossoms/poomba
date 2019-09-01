@@ -7,7 +7,7 @@ import struct
 import time
 from classifier import Classifier
 
-classifier = Classifier(1024, 768, 3)
+classifier = Classifier(640, 480, 3)
 
 def array_from_file(path):
     from PIL import Image
@@ -83,7 +83,12 @@ def classify_req(sock):
     try:
 	# run a DFT on the image to check for blurryness
 
+
 	# store the image for training later
+        img = Image.frombuffer('RGB', (w, h), frame)
+        grey_img = np.asarray(img.convert(mode='L').getdata()).reshape((w, h))
+        ft = np.fft.fft2(grey_img)
+
         save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
     except:
         pass
@@ -99,6 +104,7 @@ if __name__ == '__main__':
     HOST, PORT = '', 1337
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))
         s.listen()
 
