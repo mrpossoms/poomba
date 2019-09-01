@@ -81,6 +81,9 @@ def classify_req(sock):
         frame += chunk
 
     try:
+	# run a DFT on the image to check for blurryness
+
+	# store the image for training later
         save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
     except:
         pass

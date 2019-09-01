@@ -21,6 +21,8 @@ typedef struct {
 	void** frame_buffers;
 #ifdef __linux__
 	struct v4l2_buffer buffer_info;
+#else
+	struct { int index; } buffer_info;
 #endif
 } cam_t;
 

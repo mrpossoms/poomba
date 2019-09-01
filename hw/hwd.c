@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <netdb.h>
+#include <fcntl.h>
 #include <strings.h>
 #include <string.h>
 #include <errno.h>
@@ -91,8 +92,18 @@ abort:
 
 void get_frame(cam_t const* cam, frame_t* frame)
 {
+#ifndef __linux__
+	static int rand_fd;
+	if (rand_fd == 0)
+	{
+		rand_fd = open("/dev/random", O_RDONLY);
+	}
+
+	read(rand_fd, frame, sizeof(frame_t));
+#else
 	int bi = cam->buffer_info.index;
 	memcpy(frame, cam->frame_buffers[bi], sizeof(frame_t));
+#endif
 }
 
 
@@ -111,6 +122,12 @@ unsigned int frame_diff(frame_t* f0, frame_t* f1)
 
 int main (int argc, const char* argv[])
 {
+	if (NULL == argv[1])
+	{
+		fprintf(stderr, "Please provide IP address to pood server\n");
+		exit(1);
+	}
+
 	cam_settings_t cam_cfg = { CAM_WIDTH, CAM_HEIGHT, 30 };
 	cam_t cam = cam_open("/dev/video0", &cam_cfg);
 	frame_t frames[2];

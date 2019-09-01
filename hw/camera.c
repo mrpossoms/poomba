@@ -16,7 +16,17 @@
 
 cam_t cam_open(const char* path, cam_settings_t* cfg)
 {
-
+#ifndef __linux__
+	const size_t frame_size = cfg->width * cfg->height * 3;
+	void** frame_buffer_ptrs = (void**)malloc(sizeof(void*) * 2);
+	uint8_t* frame_buffer = (uint8_t*)malloc(frame_size * 2);
+	frame_buffer_ptrs[0] = frame_buffer;
+	frame_buffer_ptrs[1] = frame_buffer + frame_size;
+	cam_t dummy = {
+		.frame_buffers = frame_buffer_ptrs,
+	};
+	return dummy;
+#else
 	int fd = open(path, O_RDWR);
 	int res = 0;
 
@@ -122,20 +132,28 @@ cam_t cam_open(const char* path, cam_settings_t* cfg)
 	}
 
 	return cam;
+#endif
 }
 
 
 int cam_request_frame(cam_t* cam)
 {
+#ifndef __linux__
+	return 0;
+#else
 	cam->buffer_info.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	cam->buffer_info.memory = V4L2_MEMORY_MMAP;
 
 	return ioctl(cam->fd, VIDIOC_QBUF, &cam->buffer_info);
+#endif
 }
 
 
 int cam_wait_frame(cam_t* cam)
 {
+#ifndef __linux__
+	return 0;
+#else
 	int res = ioctl(cam->fd, VIDIOC_DQBUF, &cam->buffer_info);
 
 	if (res != 0) printf("cam_wait_frame(): VIDIOC_DQBUF");
@@ -155,11 +173,15 @@ int cam_wait_frame(cam_t* cam)
 	}
 
 	return res;
+#endif
 }
 
 
 int cam_config(int fd, cam_settings_t* cfg)
 {
+#ifndef __linux__
+	return 0;
+#else
 	struct v4l2_format format;
 
 	if(!cfg)
@@ -167,14 +189,6 @@ int cam_config(int fd, cam_settings_t* cfg)
 		printf("Error: null configuration provided");
 		return -1;
 	}
-
-
-	// res = ioctl(fd, VIDIOC_G_FMT, &format);
-	// if(res < 0)
-	// {
-	// 	printf("Error: failed retrieving camera settings (%d)", errno);
-	// 	return -2;
-	// }
 
 	format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	format.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24;
@@ -195,4 +209,5 @@ int cam_config(int fd, cam_settings_t* cfg)
 	parm.parm.capture.timeperframe.denominator = cfg->frame_rate;
 
 	return ioctl(fd, VIDIOC_S_PARM, &parm);
+#endif
 }
