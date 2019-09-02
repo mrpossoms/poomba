@@ -5,6 +5,7 @@ from PIL import Image
 import numpy as np
 import struct
 import time
+import pylab
 from classifier import Classifier
 
 classifier = Classifier(640, 480, 3)
@@ -86,10 +87,40 @@ def classify_req(sock):
 
 	# store the image for training later
         img = Image.frombuffer('RGB', (w, h), frame)
-        grey_img = np.asarray(img.convert(mode='L').getdata()).reshape((w, h))
-        ft = np.fft.fft2(grey_img)
 
-        save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
+        g_w, g_h = img.width // 2, img.height // 2
+        grey_img = np.asarray(img.convert(mode='L').resize((g_w, g_h)).getdata()).astype(np.int8).reshape((g_h, g_w))
+
+        K = np.array([
+            [ 0, 1, 0 ],
+            [ 1,-4, 1 ],
+            [ 0, 1, 0 ]
+        ])
+        k_r, k_c = K.shape[0], K.shape[1]
+        K = K.flatten()
+
+        mu, n, var = np.average(grey_img), 0, 0
+
+        # for r in range(0, g_h - k_r):
+        #     for c in range(0, g_w - k_c):
+        #         window = grey_img[r:r + k_r, c:c + k_c].flatten()
+        #         s = np.inner(K, window)
+        #         mu += s
+        #         n += 1
+        # mu /= n
+
+        laplacian = np.ndarray(shape=(g_h-k_r, g_w-k_c))
+
+        for r in range(0, g_h - k_r):
+            for c in range(0, g_w - k_c):
+                window = grey_img[r:r + k_r, c:c + k_c].flatten()
+                laplacian[r][c] = np.inner(K, window)
+        var = np.var(laplacian)
+
+        print('Variance: {}'.format(var))
+
+        if var >= 30000:
+            save_img_buffer('/var/poomba/ds/{}-{}.png'.format(time.time(), var), (w, h), frame)
     except:
         pass
 
