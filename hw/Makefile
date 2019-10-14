@@ -16,12 +16,12 @@ obj: bin
 %.c:
 	@echo "Building $@"
 
-obj/%.o: %.c obj
+obj/%.o: %.c 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-hwd: $(OBJS)
+hwd: obj $(OBJS)
 	@echo $(OBJS)
-	$(CC) $(CFLAGS) $^ -o bin/$@
+	$(CC) $(CFLAGS) $(OBJS) -o bin/$@
 
 .PHONY: install
 install:
