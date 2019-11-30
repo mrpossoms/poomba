@@ -83,8 +83,8 @@ def classify_req(sock):
 
     try:
 
-	# store the image for training later
-    save_img_buffer('/var/poomba/ds/{}-{}.png'.format(time.time(), var), (w, h), frame)
+	    # store the image for training later
+        save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
     except:
         pass
 
