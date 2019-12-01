@@ -7,6 +7,7 @@ import struct
 import time
 import pylab
 from classifier import Classifier
+from datastore import DataStore
 
 classifier = Classifier(640, 480, 3)
 
