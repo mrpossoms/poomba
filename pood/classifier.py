@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 import math
 from datastore import DataStore
 import cnn_5_7_fc as architecture
@@ -29,6 +30,18 @@ class Classifier:
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
+
+    def classify(self, img_arr, stride=32):
+        activation = np.array((img_arr[0] // stride, img_arr[1] // stride))
+
+        w, h = self.X.shape[0], self.X.shape[1]
+        for r in range(activation.shape[0]):
+            for c in range(activation.shape[1]):
+                r, c = r * stride, c * stride
+                patch = img_arr[r:r+w, c:c+h]
+
+                # classify patch above
+                activation[r][c] = self.sess.run(self.model['hypothesis'], feed_dict={x: patch})
 
     def train(self):
         import random
