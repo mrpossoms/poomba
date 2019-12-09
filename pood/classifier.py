@@ -7,12 +7,13 @@ from nn_helpers import serialize_matrix, deserialize_matrix, print_stats
 
 
 class Classifier:
-    def __init__(self, w, h, d):
+    def __init__(self, w, h, d, model_path="/etc/pood/model"):
         self.ds = DataStore('/var/pood/ds')
         self.X = tf.placeholder(tf.float32, [None, w, h, d], name="X")
         self.Y = tf.placeholder(tf.float32, [None, 2], name="Y")
 
         p, h = architecture.setup_model(w, h, self.X)
+        self.model_path = '{}/{}'.format((model_path, architecture.name()))
 
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.Y, logits=h)
         loss = tf.reduce_mean(cross_entropy)  # + tf.nn.l2_loss(p['fc1_w']) + tf.nn.l2_loss(p['fc0_w'])
@@ -43,11 +44,10 @@ class Classifier:
                 # classify patch above
                 activation[r][c] = self.sess.run(self.model['hypothesis'], feed_dict={x: patch})
 
-    def train(self):
+    def train(self, epochs=1):
         import random
         last_accuracy = 0
         minibatch_size = 100
-        epochs = (len(full_set) // minibatch_size) * 20
 
         for e in range(0, epochs):
             # sub_ts_x, sub_ts_y = minibatch(full_set, random.randint(0, len(full_set) // 100), size=100)

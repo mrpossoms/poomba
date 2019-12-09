@@ -1,33 +1,56 @@
 import os
 import random
 import string
+import numpy as np
 from pathlib import Path
 from PIL import Image
 
 
 class DataStore:
     class FetchOperation:
-        def __init__(self, data_store, classification):
+        def __init__(self, data_store, classifications):
             self.ds = data_store
-            self.classification = classification
+            self.classifications = classifications
             self.example_paths = []
+            self.example_labels = []
 
         def all(self):
-            files = os.listdir('{}/{}'.format(self.ds.base_path, self.classification))
-            for path, file in zip([str(self.ds.base_path)] * len(files), files):
-                self.example_paths += [ path + '/' + file ]
+            for classification in self.classifications:
+                base_path = '{}/{}'.format(self.ds.base_path, classification)
+                files = os.listdir(base_path)
+                for path, file in zip([base_path] * len(files), files):
+                    self.example_paths += [ path + '/' + file ]
+
+                    try:
+                        self.example_labels += [int(classification)]
+                    except ValueError:
+                        self.example_labels += [classification]
 
             return self.example_paths
 
-        def minibatch(self, size=100):
+        def minibatch(self, do_load=True, size=100):
             if len(self.example_paths) == 0:
-                self.mini_idx = 0
-                all()
+                self.minibatch_idx = 0
+                self.all()
 
-            batch = self.example_paths[self.mini_idx:self.minibatch_idx + size]
+            batch_paths = self.example_paths[self.minibatch_idx:self.minibatch_idx + size]
+            batch_labels = self.example_labels[self.minibatch_idx:self.minibatch_idx + size]
             self.minibatch_idx += size
 
-            return batch
+            if do_load:
+
+                X, Y = [], []
+                for path, classification in zip(batch_paths, batch_labels):
+                    img = Image.open(open(path, mode='rb'))
+                    X += [np.array(img.getdata()).reshape(img.height, img.width, 3)]
+                    try:
+                        Y += [int(classification)]
+                    except ValueError:
+                        Y += [classification]
+
+                return X, Y
+            else:
+                return batch_paths, [self.classification] * len(batch_paths)
 
     class StoreOperation:
         def __init__(self, data_store, classification):
@@ -52,8 +75,8 @@ class DataStore:
     def store(self, classification):
         return self.StoreOperation(self, classification)
 
-    def fetch(self, classification):
-        return self.FetchOperation(self, classification)
+    def fetch(self, *classifications):
+        return self.FetchOperation(self, classifications)
 
 
 if __name__ == '__main__':
@@ -74,9 +97,12 @@ if __name__ == '__main__':
     rm_tree(Path('/tmp/ds'))
 
     ds = DataStore('/tmp/ds')
-    ds.store('random').tile(img, tiles=10)
+    ds.store(0).tile(img, tiles=10)
+    ds.store(1).tile(img, tiles=10)
 
     assert(ds.base_path.exists())
-    assert(len(ds.fetch('random').all()) == 10)
+    assert(len(ds.fetch(0).all()) == 10)
+
+    X, Y = ds.fetch(0, 1).minibatch()
 
     print('ALL PASS')

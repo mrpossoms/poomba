@@ -4,6 +4,9 @@ from nn_base import ConvLayer
 from nn_base import Layer
 
 
+def name():
+    return 'cnn_5_7_fc'
+
 def setup_model(w, h, x):
     p = {
         'c0': ConvLayer(weights=tf.Variable(tf.truncated_normal([5, 5, 3, 16], stddev=0.01)),
