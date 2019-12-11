@@ -1,9 +1,14 @@
 import numpy as np
 
+
 class Layer:
     def __init__(self, weights, biases):
         self.w = weights
         self.b = biases
+
+    def serialize(self, fp, sess):
+        serialize_matrix(sess.run(self.w), fp)
+        serialize_matrix(sess.run(self.b), fp)
 
 
 class ConvLayer(Layer):

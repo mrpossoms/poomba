@@ -12,7 +12,6 @@ class DataStore:
             self.ds = data_store
             self.classifications = classifications
             self.example_paths = []
-            self.example_labels = []
 
         def all(self):
             for classification in self.classifications:
@@ -21,31 +20,38 @@ class DataStore:
                 for path, file in zip([base_path] * len(files), files):
                     self.example_paths += [ path + '/' + file ]
 
-                    try:
-                        self.example_labels += [int(classification)]
-                    except ValueError:
-                        self.example_labels += [classification]
-
             return self.example_paths
 
-        def minibatch(self, do_load=True, size=100):
+        def shuffle(self):
+            random.shuffle(self.example_paths)
+
+        def minibatch(self, do_load=True, size=100, classes=None):
             if len(self.example_paths) == 0:
                 self.minibatch_idx = 0
                 self.all()
+                self.shuffle()
 
             batch_paths = self.example_paths[self.minibatch_idx:self.minibatch_idx + size]
-            batch_labels = self.example_labels[self.minibatch_idx:self.minibatch_idx + size]
             self.minibatch_idx += size
 
             if do_load:
-
                 X, Y = [], []
-                for path, classification in zip(batch_paths, batch_labels):
+                for path in batch_paths:
                     img = Image.open(open(path, mode='rb'))
+                    classification, _ = path.replace(str(self.ds.base_path) + '/', '').split('/')
                     X += [np.array(img.getdata()).reshape(img.height, img.width, 3)]
                     try:
-                        Y += [int(classification)]
+                        classification = int(classification)
+                        if classes:
+                            # emit a 1-hot vector
+                            v = [0] * classes
+                            v[classification] = 1
+                            Y += [v]
+                        else:
+                            # emit a integer number class
+                            Y += [classification]
                     except ValueError:
+                            # emit raw string
                         Y += [classification]
 
                 return X, Y
@@ -104,5 +110,8 @@ if __name__ == '__main__':
     assert(len(ds.fetch(0).all()) == 10)
 
     X, Y = ds.fetch(0, 1).minibatch()
+
+    assert(0 in Y)
+    assert(1 in Y)
 
     print('ALL PASS')

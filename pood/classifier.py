@@ -4,16 +4,17 @@ import math
 from datastore import DataStore
 import cnn_5_7_fc as architecture
 from nn_helpers import serialize_matrix, deserialize_matrix, print_stats
+from pathlib import Path
+from PIL import Image
 
 
 class Classifier:
     def __init__(self, w, h, d, model_path="/etc/pood/model"):
-        self.ds = DataStore('/var/pood/ds')
-        self.X = tf.placeholder(tf.float32, [None, w, h, d], name="X")
-        self.Y = tf.placeholder(tf.float32, [None, 2], name="Y")
+        self.X = tf.placeholder(tf.float32, [None, h, w, d])
+        self.Y = tf.placeholder(tf.float32, [None, 2])
 
         p, h = architecture.setup_model(w, h, self.X)
-        self.model_path = '{}/{}'.format((model_path, architecture.name()))
+        self.model_path = '{}/{}'.format(model_path, architecture.name())
 
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.Y, logits=h)
         loss = tf.reduce_mean(cross_entropy)  # + tf.nn.l2_loss(p['fc1_w']) + tf.nn.l2_loss(p['fc0_w'])
@@ -44,18 +45,16 @@ class Classifier:
                 # classify patch above
                 activation[r][c] = self.sess.run(self.model['hypothesis'], feed_dict={x: patch})
 
-    def train(self, epochs=1):
-        import random
+    def train(self, datastore, epochs=1):
         last_accuracy = 0
         minibatch_size = 100
 
         for e in range(0, epochs):
-            # sub_ts_x, sub_ts_y = minibatch(full_set, random.randint(0, len(full_set) // 100), size=100)
-            sub_ts_x, sub_ts_y = minibatch(full_set, e % (len(full_set) // minibatch_size), size=100)
+            sub_ts_x, sub_ts_y = datastore.fetch(0, 1).minibatch(size=10, classes=2)
 
-            self.sess.run(self.model['train_step'], feed_dict={x: sub_ts_x, y: sub_ts_y})
+            self.sess.run(self.model['train_step'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
             if e % 100 == 0:
-                train_accuracy = self.sess.run(self.model['accuracy'], feed_dict={x: sub_ts_x, y: sub_ts_y})
+                train_accuracy = self.sess.run(self.model['accuracy'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
                 print_stats(
                     {
                         'accuracy': last_accuracy
@@ -66,12 +65,42 @@ class Classifier:
                     })
                 last_accuracy = train_accuracy
 
-            if not IS_TRAINING:
-                break
-
         # Save the learned parameters
-        for key in p:
+        for key in self.model['parameters']:
             file_name = key.replace('_', '.')
 
-            with open(MODEL_STORAGE_PATH + file_name, mode='wb') as fp:
-                serialize_matrix(sess.run(p[key]), fp)
+            with open('{}/{}'.format(self.model_path, file_name), mode='wb') as fp:
+                self.model['parameters'][key].serialize(fp, self.sess)
+
+if __name__ == '__main__':
+    def rm_tree(pth):
+        pth = Path(pth)
+        for child in pth.glob('*'):
+            if child.is_file():
+                child.unlink()
+            else:
+                rm_tree(child)
+        pth.rmdir()
+
+    try:
+        rm_tree(Path('/tmp/classifier/ds'))
+    except:
+        pass
+    ds = DataStore('/tmp/classifier/ds')
+
+    # create some examples
+    for _ in range(10):
+        red_arr = (np.random.random((480, 640, 3)) * [1, 0.1, 0.1] * 255).astype(np.uint8)
+        red_img = Image.fromarray(red_arr)
+        ds.store(0).tile(red_img, tiles=10)
+
+        blue_arr = (np.random.random((480, 640, 3)) * [0.1, 0.1, 1] * 255).astype(np.uint8)
+        blue_img = Image.fromarray(blue_arr)
+        ds.store(1).tile(blue_img, tiles=10)
+
+
+    # train on examples
+    c = Classifier(64, 64, 3)
+    c.train(ds, epochs=1000)
+
+    # verify classification
