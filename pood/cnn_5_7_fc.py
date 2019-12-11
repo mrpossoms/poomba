@@ -1,7 +1,7 @@
 import tensorflow as tf
 import math
-from nn_base import ConvLayer
-from nn_base import Layer
+from nn_helpers import ConvLayer
+from nn_helpers import Layer
 
 
 def name():
