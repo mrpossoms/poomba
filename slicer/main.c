@@ -56,6 +56,18 @@ static void create_texture(GLuint* tex)
 }
 
 
+void image_patch_b(color_t* dst, color_t* rgb, rectangle_t rect)
+{	
+	// slice out patches to use for activation
+	for (int kr = rect.h; kr--;)
+	for (int kc = rect.w; kc--;)
+	{
+		color_t color = rgb[((rect.y + kr) * FRAME_W) + rect.x + kc];
+		dst[(kr * rect.w) + kc] = color;
+	}
+}
+
+
 void frame_to_canon(float x_frame, float y_frame, float* x, float* y)
 {
     *x = ((x_frame / (float)WIN_W) - 0.5) * 2;
