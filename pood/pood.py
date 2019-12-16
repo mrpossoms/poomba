@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 
+from flask import Flask, escape, request
 import socket
 from PIL import Image
 import numpy as np
 import struct
 import time
-import pylab
 from classifier import Classifier
 from datastore import DataStore
 
 classifier = Classifier(640, 480, 3)
+app = Flask(__name__, static_url_path='')
+
 
 def array_from_file(path):
     from PIL import Image
@@ -21,42 +23,6 @@ def array_from_file(path):
 
 def save_img_buffer(path, size, buf):
     Image.frombuffer('RGB', size, buf).save(path, 'PNG')
-
-
-# class ClassifyReqHandler(StreamRequestHandler):
-#     def __init__(self, request, client_address, server):
-#         print('__init__')
-#
-#     def setup(self):
-#         print('setup')
-#
-#     def handle(self):
-#         req = self.request # this is a socket object
-#
-#         print("got connection")
-#
-#         # read and decode the header
-#         hdr_fmt = 'ccccIII'
-#         hdr_buf = req.recv(struct.calcsize(hdr_fmt))
-#         m0, m1, m2, m3, w, h, d = struct.unpack(hdr_fmt, hdr_buf)
-#
-#         # make sure this message starts with the expected magic
-#         if (m0 + m1 + m2 + m3) is not 'POOP':
-#             req.close()
-#             return
-#
-#         # the request is good, read the frame
-#         frame = req.recv(w * h * d)
-#         save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
-#
-#         # do classification here
-#
-#         # send result back
-#         is_ok = 1
-#         req.sendall(struct.pack('I', is_ok))
-#
-#     def finish(self):
-#         print('finish')
 
 
 def classify_req(sock):
@@ -96,9 +62,7 @@ def classify_req(sock):
     sock.sendall(struct.pack('I', is_ok))
 
 
-if __name__ == '__main__':
-    HOST, PORT = '', 1337
-
+def request_classifier_thread():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))
@@ -110,3 +74,21 @@ if __name__ == '__main__':
                 print('Connected by', addr)
                 classify_req(conn)
                 conn.close()
+
+
+@app.route('/')
+def index():
+    return app.send_static_file(filename='index.html')
+
+if __name__ == '__main__':
+    import threading
+    HOST, PORT = '', 1337
+
+    threading.Thread(target=request_classifier_thread).start()
+
+    app.run(host='0.0.0.0', port=8080)
+
+
+
+
+
