@@ -1,3 +1,5 @@
+#define GL_SILENCE_DEPRECATION
+
 #include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -7,14 +9,16 @@
 #include <math.h>
 #include <string.h>
 #include <pthread.h>
+#include <sys/stat.h>
 #include <dirent.h>
+#include <stdbool.h>
 
 #include <GLFW/glfw3.h>
 
 #include "cli.h"
 #include "png.h"
 
-#define GL_SILENCE_DEPRECATION 1
+
 // #define RENDER_DEMO
 
 #ifdef __linux__
@@ -34,7 +38,7 @@ GLuint frameTex;
 int LABEL_CLASS;
 char* BASE_PATH;
 char* SRC_DIR = "/var/pood/ds/src";
-img_t* CURRENT_IMG;
+img_t CURRENT_IMG;
 
 
 static void setup_gl()
@@ -57,12 +61,12 @@ static void create_texture(GLuint* tex)
 
 
 void image_patch_b(color_t* dst, color_t* rgb, rectangle_t rect)
-{	
+{
 	// slice out patches to use for activation
 	for (int kr = rect.h; kr--;)
 	for (int kc = rect.w; kc--;)
 	{
-		color_t color = rgb[((rect.y + kr) * FRAME_W) + rect.x + kc];
+		color_t color = rgb[((rect.y + kr) * CURRENT_IMG.width) + rect.x + kc];
 		dst[(kr * rect.w) + kc] = color;
 	}
 }
@@ -150,7 +154,7 @@ int main(int argc, char* argv[])
 
         if (img_name)
         {
-            snprintf(path, "%s/%s", SRC_DIR, img_name);
+            sprintf(path, "%s/%s", SRC_DIR, img_name);
             CURRENT_IMG = read_png_file_rgb(path);
         }
     }
@@ -161,12 +165,12 @@ int main(int argc, char* argv[])
             GL_TEXTURE_2D,
             0,
             GL_RGB,
-            CURRENT_IMG->width,
-            CURRENT_IMG->height,
+            CURRENT_IMG.width,
+            CURRENT_IMG.height,
             0,
             GL_RGB,
             GL_UNSIGNED_BYTE,
-            (void*)CURRENT_IMG->pixels
+            (void*)CURRENT_IMG.pixels
         );
 
         int space_down = glfwGetKey(WIN, GLFW_KEY_SPACE) == GLFW_PRESS;
@@ -203,13 +207,13 @@ int main(int argc, char* argv[])
 
                 rectangle_t patch_rec = { .w = 16, .h = 16 };
                 color_t patch[16 * 16];
-                frame_to_pix(x, y, &patch_rec.x, &patch_rec.y);
-                image_patch_b(patch, rgb, patch_rec);
+                frame_to_pix(x, y, CURRENT_IMG.width, CURRENT_IMG.height, &patch_rec.x, &patch_rec.y);
+                image_patch_b(patch, CURRENT_IMG.pixels, patch_rec);
 
                 char file_path[PATH_MAX] = {}, base_path[PATH_MAX] = {};
-                snprintf(base_path, PATH_MAX, "%s/%d", BASE_PATH, LABEL_CLASS);
+                sprintf(base_path, "%s/%d", BASE_PATH, LABEL_CLASS);
                 mkdir(base_path, 0777);
-                snprintf(file_path, PATH_MAX, "%s/%lx", base_path, random());
+                sprintf(file_path, "%s/%lx", base_path, random());
                 write_png_file_rgb(file_path, patch_rec.w, patch_rec.h, (char*)patch);
 
                 glBegin(GL_QUADS);

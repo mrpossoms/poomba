@@ -72,7 +72,7 @@ img_t read_png_file_rgb(const char* path)
     img_t img = {};
 
     char header[8];    // 8 is the maximum size that can be checked
-    png_structp png_ptr = {};
+    png_structp png_ptr = NULL;
     png_infop info_ptr;
     png_bytep* row_pointers;
     png_byte color_type;
@@ -84,28 +84,37 @@ img_t read_png_file_rgb(const char* path)
     if (!fp)
     {
         fprintf(stderr, "[read_png_file] File %s could not be opened for reading", path);
-        return -1;
+        return img;
     }
 
     fread(header, 1, 8, fp);
     if (png_sig_cmp((png_const_bytep)header, 0, 8))
     {
         fprintf(stderr, "[read_png_file] File %s is not recognized as a PNG file", path);
+        return img;
     }
-
 
     /* initialize stuff */
     png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 
     if (!png_ptr)
-        abort("[read_png_file] png_create_read_struct failed");
+    {
+        fprintf(stderr, "[read_png_file] png_create_read_struct failed");
+        return img;
+    }
 
     info_ptr = png_create_info_struct(png_ptr);
     if (!info_ptr)
-        abort("[read_png_file] png_create_info_struct failed");
+    {
+        fprintf(stderr, "[read_png_file] png_create_info_struct failed");
+        return img;
+    }
 
     if (setjmp(png_jmpbuf(png_ptr)))
-        abort("[read_png_file] Error during init_io");
+    {
+        fprintf(stderr, "[read_png_file] Error during init_io");
+        return img;
+    }
 
     png_init_io(png_ptr, fp);
     png_set_sig_bytes(png_ptr, 8);
@@ -121,7 +130,8 @@ img_t read_png_file_rgb(const char* path)
     /* read file */
     if (setjmp(png_jmpbuf(png_ptr)))
     {
-        abort("[read_png_file] Error during read_image");
+        fprintf(stderr, "[read_png_file] Error during read_image");
+        return img;
     }
 
     int depth = 0;
@@ -135,20 +145,20 @@ img_t read_png_file_rgb(const char* path)
             break;
     }
 
-    row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * height);
-    img.pixels = (color_t*)calloc(width * height, sizeof(color_t));
+    row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * img.height);
+    img.pixels = (color_t*)calloc(img.width * img.height, sizeof(color_t));
     uint8_t* pixel_buf = (uint8_t*)img.pixels;
 
-    for (int y = 0; y < height; y++)
+    for (int y = 0; y < img.height; y++)
     {
-        row_pointers[y] = (png_byte*) malloc(png_get_rowbytes(png_ptr,info_ptr));
+        row_pointers[y] = (png_byte*) malloc(png_get_rowbytes(png_ptr, info_ptr));
         assert(row_pointers[y]);
     }
 
     png_read_image(png_ptr, row_pointers);
 
-    int bytes_per_row = png_get_rowbytes(png_ptr,info_ptr);
-    for (int y = 0; y < height; y++)
+    int bytes_per_row = png_get_rowbytes(png_ptr, info_ptr);
+    for (int y = 0; y < img.height; y++)
     {
         memcpy(pixel_buf + (y * bytes_per_row), row_pointers[y], bytes_per_row);
         free(row_pointers[y]);
@@ -159,5 +169,5 @@ img_t read_png_file_rgb(const char* path)
 
     img.valid = true;
 
-    return img
+    return img;
 }
