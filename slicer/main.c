@@ -39,6 +39,7 @@ int LABEL_CLASS;
 char* BASE_PATH = "/var/pood/ds";
 char* SRC_DIR = "/var/pood/ds/src";
 img_t CURRENT_IMG;
+void* PIXELS = NULL;
 
 
 static void setup_gl()
@@ -130,6 +131,41 @@ const char* get_next_src_file(const char* src_dir)
     return dep->d_name;
 }
 
+static void cursor_position_callback(GLFWwindow* window, double x, double y)
+{
+    if (glfwGetMouseButton(WIN, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+    {
+        float ul[2];
+        float lr[2];
+
+        const int kernel_size = 64;
+        frame_to_canon(x, y, ul + 0, ul + 1);
+        frame_to_canon(x + kernel_size, y + kernel_size, lr + 0, lr + 1);
+
+        rectangle_t patch_rec = { .w = kernel_size, .h = kernel_size };
+        rgb_t patch[kernel_size * kernel_size];
+        frame_to_pix(x, y, CURRENT_IMG.width, CURRENT_IMG.height, &patch_rec.x, &patch_rec.y);
+
+        bool is_rgba = CURRENT_IMG.rgba_pixels != NULL;
+        if (is_rgba)
+        {
+            image_patch_rgba(patch, PIXELS, patch_rec);
+        }
+        else
+        {
+            image_patch_rgb(patch, PIXELS, patch_rec);
+        }
+
+
+        char file_path[PATH_MAX] = {}, base_path[PATH_MAX] = {};
+        sprintf(base_path, "%s/%d", BASE_PATH, LABEL_CLASS);
+        mkdir(base_path, 0777);
+        sprintf(file_path, "%s/%lx", base_path, random());
+
+        write_png_file_rgb(file_path, patch_rec.w, patch_rec.h, (char*)patch);
+    }
+}
+
 int main(int argc, char* argv[])
 {
     cli_cmd_t cmds[] = {
@@ -139,7 +175,7 @@ int main(int argc, char* argv[])
             .type = ARG_TYP_INT,
             .opts = { .has_value = 1, .required = 1 },
         },
-        { 'p',
+        { 'b',
             .desc = "Set base path",
             .set = &BASE_PATH,
             .type = ARG_TYP_STR,
@@ -170,17 +206,18 @@ int main(int argc, char* argv[])
         return -2;
     }
 
+    glfwSetCursorPosCallback(WIN, cursor_position_callback);
+
     srandom(time(NULL));
     glfwMakeContextCurrent(WIN);
     setup_gl();
     create_texture(&frameTex);
 
     int space_last_state = GLFW_PRESS;
-    int click_last_state = GLFW_RELEASE;
 
     while(!glfwWindowShouldClose(WIN)){
         bool is_rgba = CURRENT_IMG.rgba_pixels != NULL;
-        void* pixels = is_rgba ? (void*)CURRENT_IMG.rgba_pixels : (void*)CURRENT_IMG.rgb_pixels;
+        PIXELS = is_rgba ? (void*)CURRENT_IMG.rgba_pixels : (void*)CURRENT_IMG.rgb_pixels;
 
         if (CURRENT_IMG.valid)
         {
@@ -193,7 +230,7 @@ int main(int argc, char* argv[])
                 0,
                 is_rgba ? GL_RGBA : GL_RGB,
                 GL_UNSIGNED_BYTE,
-                pixels
+                PIXELS
             );
             glfwSetWindowSize(WIN, CURRENT_IMG.width, CURRENT_IMG.height);
 
@@ -236,9 +273,7 @@ int main(int argc, char* argv[])
 
         if (BASE_PATH)
         {
-            int mouse_state =glfwGetMouseButton(WIN, GLFW_MOUSE_BUTTON_LEFT);
-
-            if (mouse_state == GLFW_RELEASE && mouse_state != click_last_state)
+            if (glfwGetMouseButton(WIN, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
             {
                 double x, y;
                 glfwGetCursorPos(WIN, &x, &y);
@@ -250,26 +285,6 @@ int main(int argc, char* argv[])
                 frame_to_canon(x, y, ul + 0, ul + 1);
                 frame_to_canon(x + kernel_size, y + kernel_size, lr + 0, lr + 1);
 
-                rectangle_t patch_rec = { .w = kernel_size, .h = kernel_size };
-                rgb_t patch[kernel_size * kernel_size];
-                frame_to_pix(x, y, CURRENT_IMG.width, CURRENT_IMG.height, &patch_rec.x, &patch_rec.y);
-
-                if (is_rgba)
-                {
-                    image_patch_rgba(patch, pixels, patch_rec);
-                }
-                else
-                {
-                    image_patch_rgb(patch, pixels, patch_rec);
-                }
-
-
-                char file_path[PATH_MAX] = {}, base_path[PATH_MAX] = {};
-                sprintf(base_path, "%s/%d", BASE_PATH, LABEL_CLASS);
-                mkdir(base_path, 0777);
-                sprintf(file_path, "%s/%lx", base_path, random());
-
-                write_png_file_rgb(file_path, patch_rec.w, patch_rec.h, (char*)patch);
 
                 glBegin(GL_QUADS);
                     glColor4f(1, 0, 0, 0.5);
@@ -279,8 +294,6 @@ int main(int argc, char* argv[])
                     glVertex2f(ul[0], lr[1]);
                 glEnd();
             }
-            click_last_state = mouse_state;
-
         }
 
         glfwPollEvents();
