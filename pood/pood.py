@@ -11,7 +11,7 @@ from datastore import DataStore
 
 classifier = Classifier(640, 480, 3)
 app = Flask(__name__, static_url_path='')
-
+ds = DataStore('/var/pood/ds')
 
 def array_from_file(path):
     from PIL import Image
@@ -47,11 +47,16 @@ def classify_req(sock):
             break
 
         frame += chunk
+    img = Image.frombuffer('RGB', (w, h), frame)
 
     try:
+        is_poop = False
 
+        if not is_poop:
+            ds.store(0).tile(img, tiles=10)
 	    # store the image for training later
-        save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
+        #save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
+
     except:
         pass
 

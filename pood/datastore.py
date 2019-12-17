@@ -1,5 +1,6 @@
 import os
 import random
+import secrets
 import string
 import numpy as np
 from pathlib import Path
@@ -71,7 +72,7 @@ class DataStore:
                 self._store(img.crop((x, y, x + size[0], y + size[1])))
 
         def _store(self, img):
-            name = ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
+            name = secrets.token_hex(4) 
             img.save('{}/{}/{}.png'.format(self.ds.base_path, self.classification, name))
 
     def __init__(self, base_path=''):
