@@ -1,5 +1,5 @@
 $(eval OS := $(shell uname))
-CFLAGS+=-std=gnu99
+CFLAGS+=-std=gnu99 -g
 LINK += -lpng
 
 ifeq ($(OS),Darwin)

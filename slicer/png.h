@@ -4,16 +4,21 @@ typedef union {
     struct {
         uint8_t r, g, b;
     };
-    struct {
-        uint8_t y, cb, cr;
-    };
     uint8_t v[3];
-} color_t;
+} rgb_t;
+
+typedef union {
+    struct {
+        uint8_t r, g, b, a;
+    };
+    uint8_t v[4];
+} rgba_t;
 
 typedef struct {
     bool valid;
     size_t width, height;
-    color_t* pixels;
+    rgb_t* rgb_pixels;
+    rgba_t* rgba_pixels;
 } img_t;
 
 int write_png_file_rgb(
@@ -135,19 +140,23 @@ img_t read_png_file_rgb(const char* path)
     }
 
     int depth = 0;
+    uint8_t* pixel_buf = NULL;
+
     switch (color_type) {
         case PNG_COLOR_TYPE_RGBA:
             depth = 4;
+            img.rgba_pixels = (rgba_t*)calloc(img.width * img.height, sizeof(rgba_t));
+            pixel_buf = (uint8_t*)img.rgba_pixels;
             break;
         case PNG_COLOR_TYPE_PALETTE:
         case PNG_COLOR_TYPE_RGB:
             depth = 3;
+            img.rgb_pixels = (rgb_t*)calloc(img.width * img.height, sizeof(rgb_t));
+            pixel_buf = (uint8_t*)img.rgb_pixels;
             break;
     }
 
     row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * img.height);
-    img.pixels = (color_t*)calloc(img.width * img.height, sizeof(color_t));
-    uint8_t* pixel_buf = (uint8_t*)img.pixels;
 
     for (int y = 0; y < img.height; y++)
     {
