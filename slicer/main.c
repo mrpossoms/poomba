@@ -198,7 +198,6 @@ int main(int argc, char* argv[])
 
     if (!glfwInit()) { return -1; }
 
-    glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
     WIN = glfwCreateWindow(WIN_W, WIN_H, "slicer", NULL, NULL);
 
     if (!WIN){
