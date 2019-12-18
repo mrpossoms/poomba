@@ -9,7 +9,7 @@ import time
 from classifier import Classifier
 from datastore import DataStore
 
-classifier = Classifier(640, 480, 3)
+classifier = Classifier(64, 64, 3)
 app = Flask(__name__, static_url_path='')
 ds = DataStore('/var/pood/ds')
 
@@ -19,10 +19,6 @@ def array_from_file(path):
     img = Image.open(path).convert('RGB')
     w, h = img.size
     return np.array(img)[0:w,0:h,:]
-
-
-def save_img_buffer(path, size, buf):
-    Image.frombuffer('RGB', size, buf).save(path, 'PNG')
 
 
 def classify_req(sock):
@@ -54,8 +50,6 @@ def classify_req(sock):
 
         if not is_poop:
             ds.store(0).tile(img, tiles=10)
-	    # store the image for training later
-        #save_img_buffer('/var/poomba/ds/{}.png'.format(time.time()), (w, h), frame)
 
     except:
         pass
