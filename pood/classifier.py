@@ -1,9 +1,10 @@
 import tensorflow as tf
 import numpy as np
 import math
+import log
 from datastore import DataStore
 import cnn_5_7_fc as architecture
-from nn_helpers import serialize_matrix, deserialize_matrix, print_stats
+from nn_helpers import print_stats
 from pathlib import Path
 from PIL import Image
 
@@ -65,12 +66,23 @@ class Classifier:
                     })
                 last_accuracy = train_accuracy
 
+    def store(self):
         # Save the learned parameters
         for key in self.model['parameters']:
             file_name = key.replace('_', '.')
+            log.info('storing model parameter %s', key)
 
             with open('{}/{}'.format(self.model_path, file_name), mode='wb') as fp:
                 self.model['parameters'][key].serialize(fp, self.sess)
+
+    def load(self):
+        # Save the learned parameters
+        for key in self.model['parameters']:
+            file_name = key.replace('_', '.')
+            log.info('loading model parameter %s', key)
+
+            with open('{}/{}'.format(self.model_path, file_name), mode='rb') as fp:
+                self.model['parameters'][key].deserialize(fp, self.sess)
 
 if __name__ == '__main__':
     def rm_tree(pth):
@@ -97,7 +109,6 @@ if __name__ == '__main__':
         blue_arr = (np.random.random((480, 640, 3)) * [0.1, 0.1, 1] * 255).astype(np.uint8)
         blue_img = Image.fromarray(blue_arr)
         ds.store(1).tile(blue_img, tiles=10)
-
 
     # train on examples
     c = Classifier(64, 64, 3)

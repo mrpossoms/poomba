@@ -19,6 +19,8 @@ class DataStore:
                 base_path = '{}/{}'.format(self.ds.base_path, classification)
                 files = os.listdir(base_path)
                 for path, file in zip([base_path] * len(files), files):
+                    if file[0] is '.': # skip hidden files
+                        continue
                     self.example_paths += [ path + '/' + file ]
 
             return self.example_paths

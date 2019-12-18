@@ -10,6 +10,11 @@ class Layer:
         serialize_matrix(sess.run(self.w), fp)
         serialize_matrix(sess.run(self.b), fp)
 
+    def deserialize(self, fp, sess):
+        w, b = deserialize_matrices(fp)
+        sess.run(self.w.assign(w))
+        sess.run(self.b.assign(b))
+
 
 class ConvLayer(Layer):
     def __init__(self, weights, biases, stride=[1, 1, 1, 1], padding='VALID'):
@@ -54,7 +59,7 @@ def serialize_matrix(m, fp):
         fp.write(struct.pack('f', e))
 
 
-def deserialize_matrix(fp):
+def deserialize_matrices(fp):
     """
     Reads a numpy array from fp in the simple format that
     libnn's nn_mat_load() function understands
@@ -63,22 +68,30 @@ def deserialize_matrix(fp):
     """
     import struct
 
-    # read header
-    hdr_dims_size = struct.calcsize('b')
-    dims = struct.unpack_from('b', fp.read(hdr_dims_size))
+    matrices = []
 
-    shape = []
-    dim_size = struct.calcsize('i')
-    for _ in range(dims[0]):
-        shape += [struct.unpack_from('i', fp.read(dim_size))[0]]
+    while True:
+        try:
+            # read header
+            hdr_dims_size = struct.calcsize('b')
+            dims = struct.unpack_from('b', fp.read(hdr_dims_size))
 
-    # followed by each element
-    elements = []
-    el_size = struct.calcsize('f')
-    for _ in range(np.prod(shape)):
-        elements += [struct.unpack_from('f', fp.read(el_size))[0]]
+            shape = []
+            dim_size = struct.calcsize('i')
+            for _ in range(dims[0]):
+                shape += [struct.unpack_from('i', fp.read(dim_size))[0]]
 
-    return np.array(elements, dtype=np.float32).reshape(shape)
+            # followed by each element
+            elements = []
+            el_size = struct.calcsize('f')
+            for _ in range(np.prod(shape)):
+                elements += [struct.unpack_from('f', fp.read(el_size))[0]]
+
+            matrices += [(np.array(elements, dtype=np.float32).reshape(shape))]
+        except struct.error:
+            break
+
+    return matrices
 
 
 def print_stats(t_1, t):

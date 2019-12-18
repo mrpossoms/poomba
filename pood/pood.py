@@ -5,13 +5,22 @@ import socket
 from PIL import Image
 import numpy as np
 import struct
+import sys
 import time
+import log
+
 from classifier import Classifier
 from datastore import DataStore
 
 classifier = Classifier(64, 64, 3)
 app = Flask(__name__, static_url_path='')
 ds = DataStore('/var/pood/ds')
+last_frame_time = time.time()
+
+
+def has_cli_arg(arg_str):
+    return arg_str in sys.argv
+
 
 def array_from_file(path):
     from PIL import Image
@@ -22,7 +31,7 @@ def array_from_file(path):
 
 
 def classify_req(sock):
-    print("got connection")
+    log.info("got connection")
 
     # read and decode the header
     hdr_fmt = 'ccccIII'
@@ -43,18 +52,24 @@ def classify_req(sock):
             break
 
         frame += chunk
+
     img = Image.frombuffer('RGB', (w, h), frame)
 
     try:
+        # do classification here
+        collecting_negs = has_cli_arg('learning') and has_cli_arg('negatives')
         is_poop = False
+
+        if not collecting_negs:
+            classifications = classifier.classify(img)
+            is_poop = classifications.max() > 0
 
         if not is_poop:
             ds.store(0).tile(img, tiles=10)
 
+        last_frame_time = time.time()
     except:
         pass
-
-    # do classification here
 
     # send result back
     is_ok = 1
@@ -70,9 +85,21 @@ def request_classifier_thread():
         while True:
             conn, addr = s.accept()
             with conn:
-                print('Connected by', addr)
+                log.info('Connected by %s', addr)
                 classify_req(conn)
                 conn.close()
+
+
+def training_thread():
+    while True:
+        now = time.time()
+        dt = now - last_frame_time
+
+        if 10 < dt < 60:
+            c = Classifier(64, 64, 3)
+            c.train(ds, epochs=10000)
+
+        time.sleep(10)
 
 
 @app.route('/')
@@ -83,7 +110,13 @@ if __name__ == '__main__':
     import threading
     HOST, PORT = '', 1337
 
+    if has_cli_arg('learn') and has_cli_arg('negatives'):
+        log.info('Learning only negative examples')
+
+    classifier.load()
+
     threading.Thread(target=request_classifier_thread).start()
+    threading.Thread(target=training_thread).start()
 
     app.run(host='0.0.0.0', port=8080)
 
