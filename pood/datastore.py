@@ -42,7 +42,10 @@ class DataStore:
                 for path in batch_paths:
                     img = Image.open(open(path, mode='rb'))
                     classification, _ = path.replace(str(self.ds.base_path) + '/', '').split('/')
-                    X += [np.array(img.getdata()).reshape(img.height, img.width, 3)]
+                    img_arr = np.array(img.getdata()).reshape(img.height, img.width, 3)
+                    img_arr = (img_arr - img_arr.min()) / (img_arr.max() - img_arr.min())
+                    img_arr = (img_arr - 0.5) * 2.0
+                    X += [img_arr]
                     try:
                         classification = int(classification)
                         if classes:

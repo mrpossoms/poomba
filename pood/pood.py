@@ -15,7 +15,7 @@ from datastore import DataStore
 classifier = Classifier(64, 64, 3)
 app = Flask(__name__, static_url_path='')
 ds = DataStore('/var/pood/ds')
-last_frame_time = time.time()
+last_frame_time = 0
 
 
 def has_cli_arg(arg_str):
@@ -31,6 +31,8 @@ def array_from_file(path):
 
 
 def classify_req(sock):
+    global last_frame_time
+
     log.info("got connection")
 
     # read and decode the header
@@ -54,26 +56,25 @@ def classify_req(sock):
         frame += chunk
 
     img = Image.frombuffer('RGB', (w, h), frame)
+    is_poop = False
 
-    try:
-        # do classification here
-        collecting_negs = has_cli_arg('learning') and has_cli_arg('negatives')
-        is_poop = False
+    # try:
+    # do classification here
+    collecting_negs = has_cli_arg('learning') and has_cli_arg('negatives')
 
-        if not collecting_negs:
-            classifications = classifier.classify(img)
-            is_poop = classifications.max() > 0
+    if not collecting_negs:
+        classifications = classifier.classify(img)
+        is_poop = classifications.max() > 0
 
-        if not is_poop:
-            ds.store(0).tile(img, tiles=10)
+    if not is_poop:
+        ds.store(0).tile(img, tiles=10)
 
-        last_frame_time = time.time()
-    except:
-        pass
+    last_frame_time = time.time()
+    # except:
+    #     pass
 
     # send result back
-    is_ok = 1
-    sock.sendall(struct.pack('I', is_ok))
+    sock.sendall(struct.pack('I', int(not is_poop)))
 
 
 def request_classifier_thread():
@@ -97,7 +98,7 @@ def training_thread():
 
         if 10 < dt < 60:
             c = Classifier(64, 64, 3)
-            c.train(ds, epochs=10000)
+            c.train(ds, epochs=1000)
 
         time.sleep(10)
 
