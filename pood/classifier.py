@@ -34,6 +34,10 @@ class Classifier:
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
+    @property
+    def name(self):
+        return architecture.name()
+
     def classify(self, img, stride=32):
         img_arr = np.array(img.getdata()).reshape(img.width, img.height, 3)
         img_arr = (img_arr - img_arr.min()) / (img_arr.max() - img_arr.min())

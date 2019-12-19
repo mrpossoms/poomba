@@ -107,6 +107,7 @@ def training_thread():
 def index():
     return app.send_static_file(filename='index.html')
 
+
 if __name__ == '__main__':
     import threading
     HOST, PORT = '', 1337
@@ -114,7 +115,10 @@ if __name__ == '__main__':
     if has_cli_arg('learn') and has_cli_arg('negatives'):
         log.info('Learning only negative examples')
 
-    classifier.load()
+    try:
+        classifier.load()
+    except FileNotFoundError:
+        log.error('Classifier parameters for model "%s" not found, starting fresh.', classifier.name)
 
     threading.Thread(target=request_classifier_thread).start()
     threading.Thread(target=training_thread).start()
