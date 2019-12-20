@@ -13,7 +13,7 @@
 #include "camera.h"
 
 #define BLUR_THRESHOLD 0
-#define MIN_IMG_DIFF 0
+#define MIN_IMG_DIFF 2
 #define CAM_WIDTH (640 >> 0)
 #define CAM_HEIGHT (480 >> 0)
 #define DS_WIDTH  (640 >> 1)
@@ -78,9 +78,9 @@ int request_classification(const char* host_name, ds_frame_t* frame, uint32_t* i
 
 	// send the frame
 	uint8_t* buf = (uint8_t*)frame;
-	for (size_t written = 0; written < sizeof(frame_t);)
+	for (size_t written = 0; written < sizeof(ds_frame_t);)
 	{
-		int bytes = write(sock, buf + written, sizeof(frame_t) - written);
+		int bytes = write(sock, buf + written, sizeof(ds_frame_t) - written);
 
 		if (bytes < 0)
 		{
@@ -212,16 +212,9 @@ int main (int argc, const char* argv[])
 		cam_wait_frame(&cam);
 		get_frame(&cam, frames + frame_idx);
 
-		/*
-		if (i % 30) { continue; }
-
-		if (i > 1)
-		{
-			int diff = frame_diff(frames + 0, frames + 1);
-			fprintf(stderr, "frame_diff: %d\n", diff);
-			if (diff < MIN_IMG_DIFF) { continue; }
-		}
-		*/
+		int diff = frame_diff(frames + 0, frames + 1);
+		//fprintf(stderr, "frame_diff: %d\n", diff);
+		if (diff < MIN_IMG_DIFF) { continue; }
 
 		uint32_t is_ok = 0;
 		float mu = 0;
