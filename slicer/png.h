@@ -93,7 +93,7 @@ img_t read_png_file_rgb(const char* path)
     }
 
     fread(header, 1, 8, fp);
-    if (png_sig_cmp((png_const_bytep)header, 0, 8))
+    if (png_sig_cmp((const char*)header, 0, 8))
     {
         fprintf(stderr, "[read_png_file] File %s is not recognized as a PNG file", path);
         return img;

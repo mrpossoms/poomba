@@ -73,7 +73,7 @@ class DataStore:
 
         def tile(self, img, tiles=10, size=(64, 64)):
             for _ in range(tiles):
-                x, y = random.randrange(0, img.width - size[0]), random.randrange(0, img.width - size[0])
+                x, y = random.randrange(0, img.width - size[0]), random.randrange(0, img.height - size[1])
                 self._store(img.crop((x, y, x + size[0], y + size[1])))
 
         def _store(self, img):

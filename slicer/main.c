@@ -89,7 +89,7 @@ void image_patch_rgb(rgb_t* dst, rgb_t* rgb, rectangle_t rect)
 void frame_to_canon(float x_frame, float y_frame, float* x, float* y)
 {
     int w, h;
-    float x_scale = 2, y_scale = 2;
+    float x_scale = 1, y_scale = 1;
     glfwGetFramebufferSize(WIN, &w, &h);
     // glfwGetWindowContentScale(WIN, &x_scale, &y_scale);
 

@@ -74,7 +74,7 @@ def classify_req(sock):
     #     pass
 
     # send result back
-    sock.sendall(struct.pack('I', int(not is_poop)))
+    sent = sock.sendall(struct.pack('I', int(not is_poop)))
 
 
 def request_classifier_thread():
@@ -88,7 +88,7 @@ def request_classifier_thread():
             with conn:
                 log.info('Connected by %s', addr)
                 classify_req(conn)
-                conn.close()
+                #conn.close()
 
 
 def training_thread():
@@ -99,7 +99,7 @@ def training_thread():
         if 10 < dt < 60:
             c = Classifier(64, 64, 3)
             c.train(ds, epochs=1000)
-
+            c.store()
         time.sleep(10)
 
 
