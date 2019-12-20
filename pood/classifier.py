@@ -34,17 +34,28 @@ class Classifier:
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
-    def classify(self, img_arr, stride=32):
-        activation = np.array((img_arr[0] // stride, img_arr[1] // stride))
+    @property
+    def name(self):
+        return architecture.name()
 
-        w, h = self.X.shape[0], self.X.shape[1]
-        for r in range(activation.shape[0]):
-            for c in range(activation.shape[1]):
-                r, c = r * stride, c * stride
-                patch = img_arr[r:r+w, c:c+h]
+    def classify(self, img, stride=32):
+        img_arr = np.array(img.getdata()).reshape(img.width, img.height, 3)
+        img_arr = (img_arr - img_arr.min()) / (img_arr.max() - img_arr.min())
+        img_arr = (img_arr - 0.5) * 2
+
+        activation = np.zeros((img.width // stride, img.height // stride))
+
+        w, h = self.X.shape[1], self.X.shape[2]
+        for r in range(activation.shape[1] - 1):
+            for c in range(activation.shape[0] - 1):
+                _r, _c = r * stride, c * stride
+                patch = img_arr[_c:_c+w, _r:_r+h].reshape([1, w, h, 3])
 
                 # classify patch above
-                activation[r][c] = self.sess.run(self.model['hypothesis'], feed_dict={x: patch})
+                activation[c][r] = self.sess.run(self.model['hypothesis'], feed_dict={self.X: patch})[0][1]
+
+        return activation
+
 
     def train(self, datastore, epochs=1):
         last_accuracy = 0

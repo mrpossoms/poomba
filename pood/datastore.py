@@ -42,7 +42,10 @@ class DataStore:
                 for path in batch_paths:
                     img = Image.open(open(path, mode='rb'))
                     classification, _ = path.replace(str(self.ds.base_path) + '/', '').split('/')
-                    X += [np.array(img.getdata()).reshape(img.height, img.width, 3)]
+                    img_arr = np.array(img.getdata()).reshape(img.height, img.width, 3)
+                    img_arr = (img_arr - img_arr.min()) / (img_arr.max() - img_arr.min())
+                    img_arr = (img_arr - 0.5) * 2.0
+                    X += [img_arr]
                     try:
                         classification = int(classification)
                         if classes:
@@ -74,7 +77,7 @@ class DataStore:
                 self._store(img.crop((x, y, x + size[0], y + size[1])))
 
         def _store(self, img):
-            name = secrets.token_hex(4) 
+            name = secrets.token_hex(2)
             img.save('{}/{}/{}.png'.format(self.ds.base_path, self.classification, name))
 
     def __init__(self, base_path=''):
