@@ -13,28 +13,48 @@ class DataStore:
             self.ds = data_store
             self.classifications = classifications
             self.example_paths = []
+            self.minibatch_idx = 0
 
         def all(self):
+            max_class = 0
+            for classification in self.classifications:
+                base_path = '{}/{}'.format(self.ds.base_path, classification)
+                file_count = len(os.listdir(base_path))
+                if file_count > max_class:
+                    max_class = file_count
+
             for classification in self.classifications:
                 base_path = '{}/{}'.format(self.ds.base_path, classification)
                 files = os.listdir(base_path)
+
+                short = max_class - len(files)
+                if short > 0:
+                    for i in range(short):
+                        files += [files[i]]
+
                 for path, file in zip([base_path] * len(files), files):
                     if file[0] is '.': # skip hidden files
                         continue
                     self.example_paths += [ path + '/' + file ]
 
-            return self.example_paths
+            return self
 
         def shuffle(self):
             random.shuffle(self.example_paths)
+            return self
+
+        def minibatch_count(self, batch_size=100):
+            return len(self.example_paths) // batch_size
+
+        def minibatch_next_paths(self, batch_size=100):
+            return self.example_paths[self.minibatch_idx:self.minibatch_idx + batch_size]
 
         def minibatch(self, do_load=True, size=100, classes=None):
             if len(self.example_paths) == 0:
-                self.minibatch_idx = 0
                 self.all()
                 self.shuffle()
 
-            batch_paths = self.example_paths[self.minibatch_idx:self.minibatch_idx + size]
+            batch_paths = self.minibatch_next_paths(batch_size=size)
             self.minibatch_idx += size
 
             if do_load:

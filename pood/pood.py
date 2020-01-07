@@ -15,7 +15,7 @@ from datastore import DataStore
 classifier = Classifier(64, 64, 3)
 app = Flask(__name__, static_url_path='')
 ds = DataStore('/var/pood/ds')
-last_frame_time = 0
+last_frame_time = time.time()
 
 
 def has_cli_arg(arg_str):
@@ -60,7 +60,7 @@ def classify_req(sock):
 
     # try:
     # do classification here
-    collecting_negs = has_cli_arg('learning') and has_cli_arg('negatives')
+    collecting_negs = has_cli_arg('collecting') and has_cli_arg('negatives')
 
     if not collecting_negs:
         classifications = classifier.classify(img)
@@ -98,8 +98,17 @@ def training_thread():
 
         if 10 < dt < 60:
             c = Classifier(64, 64, 3)
-            c.train(ds, epochs=1000)
+            c.train(ds, epochs=300)
             c.store()
+
+            # create links to incorrectly classified examples
+            for _ in range(ds.minibatch_count(batch_size=100)):
+                paths = ds.minibatch_next_paths(batch_size=100)
+                sub_ts_x, sub_ts_y = ds.fetch(0, 1).minibatch(size=100, classes=2)
+
+                h = c.sess.run(c.model['hypothesis'], feed_dict={c.X: sub_ts_x, c.Y: sub_ts_y})
+                print(h)
+
         time.sleep(10)
 
 
@@ -112,8 +121,8 @@ if __name__ == '__main__':
     import threading
     HOST, PORT = '', 1337
 
-    if has_cli_arg('learn') and has_cli_arg('negatives'):
-        log.info('Learning only negative examples')
+    if has_cli_arg('collect') and has_cli_arg('negatives'):
+        log.info('Collecting only negative examples')
 
     try:
         classifier.load()

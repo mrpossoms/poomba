@@ -59,29 +59,48 @@ class Classifier:
 
     def train(self, datastore, epochs=1):
         last_accuracy = 0
-        minibatch_size = 100
+        minibatch_size = 1000
 
         for e in range(0, epochs):
-            sub_ts_x, sub_ts_y = datastore.fetch(0, 1).minibatch(size=10, classes=2)
+            fetched = datastore.fetch(0, 1).all().shuffle()
+            for _ in range(0, fetched.minibatch_count(batch_size=minibatch_size)):
+                sub_ts_x, sub_ts_y = fetched.minibatch(size=minibatch_size, classes=2)
 
-            self.sess.run(self.model['train_step'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
-            if e % 100 == 0:
-                train_accuracy = self.sess.run(self.model['accuracy'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
-                print_stats(
-                    {
-                        'accuracy': last_accuracy
-                    }, {
-                        'accuracy': train_accuracy,
-                        'epoch': e,
-                        'epoch_total': epochs
-                    })
-                last_accuracy = train_accuracy
+                self.sess.run(self.model['train_step'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
+
+                if _ % 10 == 0:
+                    train_accuracy = self.sess.run(self.model['accuracy'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
+                    print_stats(
+                        {
+                            'accuracy': last_accuracy
+                        }, {
+                            'accuracy': train_accuracy,
+                            'epoch': _,
+                            'epoch_total': fetched.minibatch_count(batch_size=minibatch_size)
+                        })
+                    last_accuracy = train_accuracy
 
     def store(self):
+        def mkdir_p(path):
+            import os
+            import errno
+            try:
+                os.makedirs(path)
+            except OSError as exc:  # Python >2.5
+                if exc.errno == errno.EEXIST and os.path.isdir(path):
+                    pass
+                else:
+                    raise
+
+	# make sure this directory exists
+        mkdir_p(self.model_path)
+
         # Save the learned parameters
         for key in self.model['parameters']:
             file_name = key.replace('_', '.')
             log.info('storing model parameter %s', key)
+
+           
 
             with open('{}/{}'.format(self.model_path, file_name), mode='wb') as fp:
                 self.model['parameters'][key].serialize(fp, self.sess)
