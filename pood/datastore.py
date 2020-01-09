@@ -13,28 +13,69 @@ class DataStore:
             self.ds = data_store
             self.classifications = classifications
             self.example_paths = []
+            self.minibatch_idx = 0
 
         def all(self):
+            max_class = 0
+            min_class = 10e6
+            for classification in self.classifications:
+                base_path = '{}/{}'.format(self.ds.base_path, classification)
+                file_count = len(os.listdir(base_path))
+                if file_count > max_class:
+                    max_class = file_count
+
+                if file_count < min_class:
+                    min_class = file_count
+
             for classification in self.classifications:
                 base_path = '{}/{}'.format(self.ds.base_path, classification)
                 files = os.listdir(base_path)
+                random.shuffle(files)
+                files = files[:min_class]
+
+                #files = os.listdir(base_path)
+
+                # short = max_class - len(files)
+                # if short > 0:
+                #     for i in range(short):
+                #         files += [files[i]]
+
                 for path, file in zip([base_path] * len(files), files):
                     if file[0] is '.': # skip hidden files
                         continue
                     self.example_paths += [ path + '/' + file ]
 
-            return self.example_paths
+            return self
+
+        def lower(self, percentage=0.75):
+            self.all()
+            count = int(len(self.example_paths) * percentage)
+            self.example_paths = self.example_paths[0:count]
+            return self
+
+        def upper(self, percentage=0.25):
+            self.all()
+            ds_size = len(self.example_paths)
+            count = int(ds_size * percentage)
+            self.example_paths = self.example_paths[ds_size - count: ds_size]
+            return self
 
         def shuffle(self):
             random.shuffle(self.example_paths)
+            return self
+
+        def minibatch_count(self, batch_size=100):
+            return len(self.example_paths) // batch_size
+
+        def minibatch_next_paths(self, batch_size=100):
+            return self.example_paths[self.minibatch_idx:self.minibatch_idx + batch_size]
 
         def minibatch(self, do_load=True, size=100, classes=None):
             if len(self.example_paths) == 0:
-                self.minibatch_idx = 0
                 self.all()
                 self.shuffle()
 
-            batch_paths = self.example_paths[self.minibatch_idx:self.minibatch_idx + size]
+            batch_paths = self.minibatch_next_paths(batch_size=size)
             self.minibatch_idx += size
 
             if do_load:
@@ -42,10 +83,18 @@ class DataStore:
                 for path in batch_paths:
                     img = Image.open(open(path, mode='rb'))
                     classification, _ = path.replace(str(self.ds.base_path) + '/', '').split('/')
+
                     img_arr = np.array(img.getdata()).reshape(img.height, img.width, 3)
-                    img_arr = (img_arr - img_arr.min()) / (img_arr.max() - img_arr.min())
-                    img_arr = (img_arr - 0.5) * 2.0
+                    min_max_delta = img_arr.max() - img_arr.min()
+
+                    if not np.isnan(min_max_delta) and min_max_delta > 0:
+                        img_arr = (img_arr - img_arr.min()) / min_max_delta
+                        img_arr = (img_arr - 0.5) * 2.0
+                    else:
+                        img_arr.fill(-1)
+
                     X += [img_arr]
+
                     try:
                         classification = int(classification)
                         if classes:
@@ -73,7 +122,7 @@ class DataStore:
 
         def tile(self, img, tiles=10, size=(64, 64)):
             for _ in range(tiles):
-                x, y = random.randrange(0, img.width - size[0]), random.randrange(0, img.width - size[0])
+                x, y = random.randrange(0, img.width - size[0]), random.randrange(0, img.height - size[1])
                 self._store(img.crop((x, y, x + size[0], y + size[1])))
 
         def _store(self, img):

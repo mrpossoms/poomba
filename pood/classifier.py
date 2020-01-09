@@ -4,6 +4,7 @@ import math
 import log
 from datastore import DataStore
 import cnn_5_7_fc as architecture
+# import cnn_12_5_5_f1024_fc as architecture
 from nn_helpers import print_stats
 from pathlib import Path
 from PIL import Image
@@ -38,46 +39,68 @@ class Classifier:
     def name(self):
         return architecture.name()
 
-    def classify(self, img, stride=32):
+    def classify(self, img, stride=8):
         img_arr = np.array(img.getdata()).reshape(img.width, img.height, 3)
         img_arr = (img_arr - img_arr.min()) / (img_arr.max() - img_arr.min())
         img_arr = (img_arr - 0.5) * 2
 
-        activation = np.zeros((img.width // stride, img.height // stride))
-
         w, h = self.X.shape[1], self.X.shape[2]
-        for r in range(activation.shape[1] - 1):
-            for c in range(activation.shape[0] - 1):
+        _w, _h = img.width - w, img.height - h
+        activation = np.zeros((_w // stride, _h // stride))
+        visual = np.zeros((_h // stride, _w // stride, 3))
+
+        for r in range(activation.shape[1]):
+            for c in range(activation.shape[0]):
                 _r, _c = r * stride, c * stride
                 patch = img_arr[_c:_c+w, _r:_r+h].reshape([1, w, h, 3])
 
                 # classify patch above
-                activation[c][r] = self.sess.run(self.model['hypothesis'], feed_dict={self.X: patch})[0][1]
+                a = self.sess.run(self.model['hypothesis'], feed_dict={self.X: patch})[0]
+                activation[c][r] = a.argmax()
+                if activation[c][r] > 0:
+                    visual[r][c] = np.array([255, 0, 0])
+                else:
+                    visual[r][c] = np.array([0, 255, 0])
 
-        return activation
-
+        return activation, visual.astype('uint8')
 
     def train(self, datastore, epochs=1):
         last_accuracy = 0
-        minibatch_size = 100
+        minibatch_size = 200
 
         for e in range(0, epochs):
-            sub_ts_x, sub_ts_y = datastore.fetch(0, 1).minibatch(size=10, classes=2)
+            fetched = datastore.fetch(0, 1).all().shuffle()
+            for _ in range(0, fetched.minibatch_count(batch_size=minibatch_size)):
+                sub_ts_x, sub_ts_y = fetched.minibatch(size=minibatch_size, classes=2)
 
-            self.sess.run(self.model['train_step'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
-            if e % 100 == 0:
-                train_accuracy = self.sess.run(self.model['accuracy'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
-                print_stats(
-                    {
-                        'accuracy': last_accuracy
-                    }, {
-                        'accuracy': train_accuracy,
-                        'epoch': e,
-                        'epoch_total': epochs
-                    })
-                last_accuracy = train_accuracy
+                self.sess.run(self.model['train_step'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
+
+                if _ % 10 == 0:
+                    train_accuracy = self.sess.run(self.model['accuracy'], feed_dict={self.X: sub_ts_x, self.Y: sub_ts_y})
+                    print_stats(
+                        {
+                            'accuracy': last_accuracy
+                        }, {
+                            'accuracy': train_accuracy,
+                            'epoch': _,
+                            'epoch_total': fetched.minibatch_count(batch_size=minibatch_size)
+                        })
+                    last_accuracy = train_accuracy
 
     def store(self):
+        def mkdir_p(path):
+            import os
+            import errno
+            try:
+                os.makedirs(path)
+            except OSError as exc:  # Python >2.5
+                if exc.errno == errno.EEXIST and os.path.isdir(path):
+                    pass
+                else:
+                    raise
+	    # make sure this directory exists
+        mkdir_p(self.model_path)
+
         # Save the learned parameters
         for key in self.model['parameters']:
             file_name = key.replace('_', '.')
@@ -94,6 +117,7 @@ class Classifier:
 
             with open('{}/{}'.format(self.model_path, file_name), mode='rb') as fp:
                 self.model['parameters'][key].deserialize(fp, self.sess)
+
 
 if __name__ == '__main__':
     def rm_tree(pth):

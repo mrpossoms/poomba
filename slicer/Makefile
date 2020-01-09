@@ -1,6 +1,6 @@
 $(eval OS := $(shell uname))
 CFLAGS+=-std=c99 -g
-LINK += -lpng
+LINK += -lpng12
 
 ifeq ($(OS),Darwin)
 	LINK +=-lpthread -lm -lglfw3 -framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo
