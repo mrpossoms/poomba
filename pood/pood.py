@@ -8,6 +8,7 @@ import struct
 import sys
 import time
 import log
+import os
 
 from classifier import Classifier
 from datastore import DataStore
@@ -15,7 +16,8 @@ from datastore import DataStore
 classifier = Classifier(64, 64, 3)
 app = Flask(__name__, static_url_path='')
 ds = DataStore('/var/pood/ds')
-last_frame_time = time.time()
+last_frame_time = 0
+frames_received = 100
 
 
 def has_cli_arg(arg_str):
@@ -31,7 +33,7 @@ def array_from_file(path):
 
 
 def classify_req(sock):
-    global last_frame_time
+    global last_frame_time, frames_received
 
     log.info("got connection")
 
@@ -55,16 +57,25 @@ def classify_req(sock):
 
         frame += chunk
 
-    img = Image.frombuffer('RGB', (w, h), frame)
+    img = Image.frombuffer('RGB', (w, h), frame) #.crop((0, h//2, w, h))
     is_poop = False
+    frames_received += 1
 
     # try:
     # do classification here
-    collecting_negs = has_cli_arg('collecting') and has_cli_arg('negatives')
+    collecting_negs = has_cli_arg('collect') and has_cli_arg('negatives')
+    collecting_pos = has_cli_arg('collect') and has_cli_arg('positives')
 
-    if not collecting_negs:
-        classifications = classifier.classify(img)
+    if collecting_negs:
+        pass
+    elif collecting_pos:
+        ds.store('src')._store(img)
+    else:
+        classifications, visualization = classifier.classify(img)
         is_poop = classifications.max() > 0
+
+        with open('/tmp/pood.classification.png', 'wb') as fp:
+            Image.fromarray(visualization, mode="RGB").save(fp)
 
     if not is_poop:
         ds.store(0).tile(img, tiles=10)
@@ -92,22 +103,40 @@ def request_classifier_thread():
 
 
 def training_thread():
+    global frames_received, classifier
+
     while True:
         now = time.time()
         dt = now - last_frame_time
 
-        if 10 < dt < 60:
-            c = Classifier(64, 64, 3)
-            c.train(ds, epochs=300)
-            c.store()
+        if 2 < dt < 60 and frames_received >= 100:
+            frames_received = 0
+
+            classifier.train(ds, epochs=1)
+            classifier.store()
+
+            os.system('rm /var/pood/err/*')
 
             # create links to incorrectly classified examples
-            for _ in range(ds.minibatch_count(batch_size=100)):
-                paths = ds.minibatch_next_paths(batch_size=100)
-                sub_ts_x, sub_ts_y = ds.fetch(0, 1).minibatch(size=100, classes=2)
+            fetch = ds.fetch(0, 1).all()
 
-                h = c.sess.run(c.model['hypothesis'], feed_dict={c.X: sub_ts_x, c.Y: sub_ts_y})
-                print(h)
+            paths = fetch.minibatch_next_paths(batch_size=1000)
+            sub_ts_x, sub_ts_y = fetch.minibatch(size=1000, classes=2)
+
+            h = classifier.sess.run(classifier.model['hypothesis'], feed_dict={classifier.X: sub_ts_x, classifier.Y: sub_ts_y})
+
+            for row in h:
+                i = row.argmax()
+                row *= 0
+                row[i] = 1
+
+            for y, h, path in zip(sub_ts_y, h, paths):
+                if np.linalg.norm(y - h) > 0.001:
+                    parts = path.split('/')
+                    last = parts[len(parts) - 1]
+                    os.symlink(path, '/var/pood/err/{}'.format(last))
+
+            log.info("Training and testing complete")
 
         time.sleep(10)
 
@@ -131,6 +160,9 @@ if __name__ == '__main__':
 
     threading.Thread(target=request_classifier_thread).start()
     threading.Thread(target=training_thread).start()
+
+    if has_cli_arg('train'):
+        last_frame_time = time.time()
 
     app.run(host='0.0.0.0', port=8080)
 
