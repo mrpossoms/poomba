@@ -13,7 +13,7 @@ import os
 from classifier import Classifier
 from datastore import DataStore
 
-classifier = Classifier(64, 64, 3)
+classifier = Classifier(16, 16, 3)
 app = Flask(__name__, static_url_path='')
 ds = DataStore('/var/pood/ds')
 last_frame_time = 0
@@ -57,7 +57,7 @@ def classify_req(sock):
 
         frame += chunk
 
-    img = Image.frombuffer('RGB', (w, h), frame) #.crop((0, h//2, w, h))
+    img = Image.frombuffer('RGB', (w, h), frame)
     is_poop = False
     frames_received += 1
 

@@ -39,28 +39,29 @@ class Classifier:
     def name(self):
         return architecture.name()
 
-    def classify(self, img, stride=8):
-        img_arr = np.array(img.getdata()).reshape(img.width, img.height, 3)
+    def classify(self, img, stride=16):
+        img_original = np.array(img.getdata()).reshape(img.height, img.width, 3)
+        img_arr = np.array(img.getdata()).reshape(img.height, img.width, 3)
         img_arr = (img_arr - img_arr.min()) / (img_arr.max() - img_arr.min())
         img_arr = (img_arr - 0.5) * 2
 
         w, h = self.X.shape[1], self.X.shape[2]
         _w, _h = img.width - w, img.height - h
-        activation = np.zeros((_w // stride, _h // stride))
-        visual = np.zeros((_h // stride, _w // stride, 3))
+        activation = np.zeros((_h // stride, _w // stride))
+        visual = np.array(img.getdata()).reshape(img.height, img.width, 3)
 
-        for r in range(activation.shape[1]):
-            for c in range(activation.shape[0]):
+        for r in range(activation.shape[0]):
+            for c in range(activation.shape[1]):
                 _r, _c = r * stride, c * stride
-                patch = img_arr[_c:_c+w, _r:_r+h].reshape([1, w, h, 3])
+                patch = img_arr[_r:_r+h, _c:_c+h].reshape([1, w, h, 3])
 
                 # classify patch above
                 a = self.sess.run(self.model['hypothesis'], feed_dict={self.X: patch})[0]
-                activation[c][r] = a.argmax()
-                if activation[c][r] > 0:
-                    visual[r][c] = np.array([255, 0, 0])
+                activation[r][c] = a.argmax()
+                if activation[r][c] > 0:
+                    visual[_r:_r+h, _c:_c+h] = img_original[_r:_r+h, _c:_c+h] * np.array([1, 0, 0])
                 else:
-                    visual[r][c] = np.array([0, 255, 0])
+                    visual[_r:_r+h, _c:_c+h] = img_original[_r:_r+h, _c:_c+h] * np.array([0, 1, 0])
 
         return activation, visual.astype('uint8')
 
