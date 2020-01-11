@@ -71,13 +71,13 @@ int request_classification(const char* host_name, ds_frame_t* frame, uint32_t* i
 	hdr_t hdr = {
 		.magic = "POOP",
 		.width = DS_WIDTH,
-		.height = DS_HEIGHT >> 1, // we will only send the bottom half of the frame
+		.height = DS_HEIGHT >> 2, // we will only send the bottom half of the frame
 		.depth = 3,
 	};
 	if (write(sock, &hdr, sizeof(hdr_t)) != sizeof(hdr_t)) { res = -3; goto abort; }
 
 	// send the frame
-	size_t to_write = sizeof(ds_frame_t) >> 1;
+	size_t to_write = sizeof(ds_frame_t) >> 2;
 	uint8_t* buf = ((uint8_t*)frame);
 
 	for (size_t written = 0; written < to_write;)
