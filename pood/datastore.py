@@ -81,7 +81,7 @@ class DataStore:
             if do_load:
                 X, Y = [], []
                 for path in batch_paths:
-                    img = Image.open(open(path, mode='rb'))
+                    img = Image.open(open(path, mode='rb')).crop((0, 0, 16, 16))
                     classification, _ = path.replace(str(self.ds.base_path) + '/', '').split('/')
 
                     img_arr = np.array(img.getdata()).reshape(img.height, img.width, 3)
@@ -126,7 +126,7 @@ class DataStore:
                 self._store(img.crop((x, y, x + size[0], y + size[1])))
 
         def _store(self, img):
-            name = secrets.token_hex(2)
+            name = secrets.token_hex(3)
             img.save('{}/{}/{}.png'.format(self.ds.base_path, self.classification, name))
 
     def __init__(self, base_path=''):

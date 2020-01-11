@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 from flask import Flask, escape, request
+from flask_socketio import SocketIO
+
 import socket
 from PIL import Image
 import numpy as np
@@ -13,8 +15,9 @@ import os
 from classifier import Classifier
 from datastore import DataStore
 
-classifier = Classifier(64, 64, 3)
+classifier = Classifier(16, 16, 3)
 app = Flask(__name__, static_url_path='')
+socketio = SocketIO(app)
 ds = DataStore('/var/pood/ds')
 last_frame_time = 0
 frames_received = 100
@@ -24,20 +27,19 @@ def has_cli_arg(arg_str):
     return arg_str in sys.argv
 
 
-def array_from_file(path):
-    from PIL import Image
-
-    img = Image.open(path).convert('RGB')
-    w, h = img.size
-    return np.array(img)[0:w,0:h,:]
+@socketio.on('connect')
+def dash_connection():
+    log.info('Dashboard connected')
 
 
 def classify_req(sock):
     global last_frame_time, frames_received
 
+    start_time = time.time()
     log.info("got connection")
 
     # read and decode the header
+    read_start = time.time()
     hdr_fmt = 'ccccIII'
     hdr_buf = sock.recv(struct.calcsize(hdr_fmt))
     m0, m1, m2, m3, w, h, d = struct.unpack(hdr_fmt, hdr_buf)
@@ -57,7 +59,9 @@ def classify_req(sock):
 
         frame += chunk
 
-    img = Image.frombuffer('RGB', (w, h), frame) #.crop((0, h//2, w, h))
+    img = Image.frombuffer('RGB', (w, h), frame)
+    log.info('Frame read took %f sec', time.time() - read_start)
+
     is_poop = False
     frames_received += 1
 
@@ -72,13 +76,20 @@ def classify_req(sock):
         ds.store('src')._store(img)
     else:
         classifications, visualization = classifier.classify(img)
-        is_poop = classifications.max() > 0
+        is_poop = classifications.sum() >= 2
 
-        with open('/tmp/pood.classification.png', 'wb') as fp:
-            Image.fromarray(visualization, mode="RGB").save(fp)
+        visualization = np.dstack((visualization, np.ones(visualization.shape[0:2], dtype='uint8') * 255))
 
-    if not is_poop:
-        ds.store(0).tile(img, tiles=10)
+        transmit_start = time.time()
+        socketio.emit('size', {'w': w, 'h': h})
+        socketio.emit('frame', {'data': visualization.flatten().tobytes()})
+        log.info('Transmit frame took %f sec', time.time() - start_time)
+
+        # with open('/tmp/pood.classification.png', 'wb') as fp:
+        #     Image.fromarray(visualization, mode="RGB").save(fp)
+
+    # if not is_poop:
+    #     ds.store(0).tile(img, tiles=10)
 
     last_frame_time = time.time()
     # except:
@@ -86,6 +97,8 @@ def classify_req(sock):
 
     # send result back
     sent = sock.sendall(struct.pack('I', int(not is_poop)))
+
+    log.info('Classification request took %f sec', time.time() - start_time)
 
 
 def request_classifier_thread():
@@ -164,7 +177,7 @@ if __name__ == '__main__':
     if has_cli_arg('train'):
         last_frame_time = time.time()
 
-    app.run(host='0.0.0.0', port=8080)
+    socketio.run(app, host='0.0.0.0', port=8080)
 
 
 

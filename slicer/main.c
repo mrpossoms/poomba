@@ -40,7 +40,7 @@ char* BASE_PATH = "/var/pood/ds";
 char* SRC_DIR = "/var/pood/ds/src";
 img_t CURRENT_IMG;
 void* PIXELS = NULL;
-
+const int kernel_size = 16;
 
 static void setup_gl()
 {
@@ -138,7 +138,6 @@ static void cursor_position_callback(GLFWwindow* window, double x, double y)
         float ul[2];
         float lr[2];
 
-        const int kernel_size = 64;
         frame_to_canon(x, y, ul + 0, ul + 1);
         frame_to_canon(x + kernel_size, y + kernel_size, lr + 0, lr + 1);
 
@@ -280,7 +279,6 @@ int main(int argc, char* argv[])
                 float ul[2];
                 float lr[2];
 
-                const int kernel_size = 64;
                 frame_to_canon(x, y, ul + 0, ul + 1);
                 frame_to_canon(x + kernel_size, y + kernel_size, lr + 0, lr + 1);
 
