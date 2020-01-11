@@ -3,10 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <title>pood</title>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
+    <script type="text/javascript" charset="utf-8">
+        var io = io();
+        io.on('connect', function() {
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d');
+            var w, h;
+
+            io.on('size', function(msg) {
+                console.log(msg);
+                w = msg.w
+                h = msg.h
+            });
+
+            io.on('frame', function(msg) {
+                console.log(msg);
+
+                ctx.putImageData(new ImageData(new Uint8ClampedArray(msg.data), w, h), 0, 0);
+            });
+        });
+
+
+    </script>
 </head>
 <body>
 <header>
     <h1>pood</h1>
 </header>
+<canvas width="320" height="120" id="canvas"></canvas>
 </body>
 </html>

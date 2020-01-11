@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import log
 import pathlib
 from PIL import Image
 from PIL import ImageEnhance
