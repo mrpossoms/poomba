@@ -22,6 +22,8 @@
                 console.log(msg);
 
                 ctx.putImageData(new ImageData(new Uint8ClampedArray(msg.data), w, h), 0, 0);
+
+<!--                document.getElementById('unknown').src = '/unknown?' + new Date().getTime();-->
             });
         });
 
@@ -33,5 +35,16 @@
     <h1>pood</h1>
 </header>
 <canvas width="320" height="120" id="canvas"></canvas>
+<br/>
+<img src="/unknown" id="unknown">
+<form action="/unknown/negative">
+    <input type="submit" value="Not Poop"/>
+</form>
+<form action="/unknown/next">
+    <input type="submit" value="Skip"/>
+</form>
+<form action="/force-train">
+    <input type="submit" value="Force Training"/>
+</form>
 </body>
 </html>

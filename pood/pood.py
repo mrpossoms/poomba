@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from flask import Flask, escape, request
+from flask import Flask, escape, request, send_file, redirect
 from flask_socketio import SocketIO
 
 import socket
@@ -22,18 +22,16 @@ socketio = SocketIO(app)
 ds = DataStore('/var/pood/ds')
 last_frame_time = 0
 frames_received = 100
+positives_last_frame = 0
+force_training = False
 
 
 def has_cli_arg(arg_str):
     return arg_str in sys.argv
 
 
-@socketio.on('connect')
-def dash_connection():
-    log.info('Dashboard connected')
-
 def classify_req(sock):
-    global last_frame_time, frames_received
+    global last_frame_time, frames_received, positives_last_frame
 
     start_time = time.time()
     log.info("got connection")
@@ -71,12 +69,14 @@ def classify_req(sock):
     collecting_pos = has_cli_arg('collect') and has_cli_arg('positives')
 
     if collecting_negs:
-        pass
+        ds.store(0).tile(img, tiles=10, size=(16, 16))
     elif collecting_pos:
         ds.store('src')._store(img)
     else:
         classifications, visualization = classifier.classify(img)
-        is_poop = classifications.sum() >= 2
+        positives = classifications.sum()
+        is_poop = positives + positives_last_frame >= 4
+        positives_last_frame = positives
 
         if is_poop:
             # the frame was classified as poop. Save it to confirm later
@@ -92,8 +92,8 @@ def classify_req(sock):
         # with open('/tmp/pood.classification.png', 'wb') as fp:
         #     Image.fromarray(visualization, mode="RGB").save(fp)
 
-    # if not is_poop:
-    #     ds.store(0).tile(img, tiles=10)
+    if not is_poop and np.random.rand() < 0.01:
+        ds.store(0).tile(img, tiles=10, size=(16, 16))
 
     last_frame_time = time.time()
     # except:
@@ -120,14 +120,15 @@ def request_classifier_thread():
 
 
 def training_thread():
-    global frames_received, classifier
+    global frames_received, classifier, force_training
 
     while True:
         now = time.time()
         dt = now - last_frame_time
 
-        if 2 < dt < 60 and frames_received >= 100:
+        if (2 < dt < 60 and frames_received >= 100) or force_training:
             frames_received = 0
+            force_training = False
 
             classifier.train(ds, epochs=1)
             classifier.store()
@@ -157,20 +158,38 @@ def training_thread():
 
         time.sleep(10)
 
+
+@socketio.on('connect')
+def dash_connection():
+    log.info('Dashboard connected')
+
+
+@app.route('/force-train')
+def force_train():
+    global force_training
+    force_training = True
+    return redirect('/')
+
+
 @app.route('/unknown/next')
 def unknown_next():
     paths = DataStore('/tmp/pood/ds').fetch(1).all().paths()
-    if len(paths) == 0:
+    if len(paths) > 0:
         os.unlink(paths[0])
+    return redirect('/')
+
 
 @app.route('/unknown/negative')
 def unknown_negative():
+    global ds
     _ds = DataStore('/tmp/pood/ds')
     paths = _ds.fetch(1).all().paths()
-    if len(paths) == 0:
+    if len(paths) > 0:
         path = paths[0]
-        _ds.store(0).tile(Image.open(open(path, mode='rb')), 100, size=(16, 16))
+        ds.store(0).tile(Image.open(open(path, mode='rb')), 100, size=(16, 16))
         os.unlink(path)
+    return redirect('/')
+
 
 @app.route('/unknown')
 def unknown():
@@ -178,9 +197,12 @@ def unknown():
 
     if len(paths) == 0:
         # return 404
-        return app.res
+        return 'No images found', 404
 
-    return app.send_file(paths[0])
+    resp =  send_file(paths[0])
+    resp.headers['Cache-Control'] = 'no-cache, must-revalidate'
+    return resp
+
 
 @app.route('/')
 def index():
