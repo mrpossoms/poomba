@@ -15,6 +15,7 @@ import os
 from classifier import Classifier
 from datastore import DataStore
 
+
 classifier = Classifier(16, 16, 3)
 app = Flask(__name__, static_url_path='')
 socketio = SocketIO(app)
@@ -30,7 +31,6 @@ def has_cli_arg(arg_str):
 @socketio.on('connect')
 def dash_connection():
     log.info('Dashboard connected')
-
 
 def classify_req(sock):
     global last_frame_time, frames_received
@@ -77,6 +77,10 @@ def classify_req(sock):
     else:
         classifications, visualization = classifier.classify(img)
         is_poop = classifications.sum() >= 2
+
+        if is_poop:
+            # the frame was classified as poop. Save it to confirm later
+            DataStore('/tmp/pood/ds').store(1).image(img)
 
         visualization = np.dstack((visualization, np.ones(visualization.shape[0:2], dtype='uint8') * 255))
 
@@ -153,6 +157,30 @@ def training_thread():
 
         time.sleep(10)
 
+@app.route('/unknown/next')
+def unknown_next():
+    paths = DataStore('/tmp/pood/ds').fetch(1).all().paths()
+    if len(paths) == 0:
+        os.unlink(paths[0])
+
+@app.route('/unknown/negative')
+def unknown_negative():
+    _ds = DataStore('/tmp/pood/ds')
+    paths = _ds.fetch(1).all().paths()
+    if len(paths) == 0:
+        path = paths[0]
+        _ds.store(0).tile(Image.open(open(path, mode='rb')), 100, size=(16, 16))
+        os.unlink(path)
+
+@app.route('/unknown')
+def unknown():
+    paths = DataStore('/tmp/pood/ds').fetch(1).all().paths()
+
+    if len(paths) == 0:
+        # return 404
+        return app.res
+
+    return app.send_file(paths[0])
 
 @app.route('/')
 def index():

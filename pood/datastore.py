@@ -15,6 +15,9 @@ class DataStore:
             self.example_paths = []
             self.minibatch_idx = 0
 
+        def paths(self):
+            return self.example_paths
+
         def all(self):
             max_class = 0
             min_class = 10e6
@@ -124,6 +127,9 @@ class DataStore:
             for _ in range(tiles):
                 x, y = random.randrange(0, img.width - size[0]), random.randrange(0, img.height - size[1])
                 self._store(img.crop((x, y, x + size[0], y + size[1])))
+
+        def image(self, img):
+            self._store(img)
 
         def _store(self, img):
             name = secrets.token_hex(3)
