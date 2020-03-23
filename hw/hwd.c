@@ -12,6 +12,9 @@
 #include "gpio.h"
 #include "camera.h"
 
+#define PIN_WHEEL_SENSOR 4
+#define PIN_HEADLIGHT 21
+
 #define BLUR_THRESHOLD 0
 #define MIN_IMG_DIFF 2
 #define CAM_WIDTH (640 >> 0)
@@ -94,10 +97,28 @@ int request_classification(const char* host_name, ds_frame_t* frame, uint32_t* i
 	}
 
 	// wait, and read back the classification
-	if (read(sock, is_ok, sizeof(uint32_t)) != sizeof(uint32_t))
+	fd_set rfds;
+	struct timeval tv = {
+		.tv_sec = 1,
+	};
+
+	FD_ZERO(&rfds);
+	FD_SET(sock, &rfds);
+
+	switch (select(sock + 1, &rfds, NULL, NULL, &tv))
 	{
-		res = -6; goto abort;
+	case -1:
+	case 0:
+		is_ok = 0; 
+		break;
+	default:
+		if (read(sock, is_ok, sizeof(uint32_t)) != sizeof(uint32_t))
+		{
+			res = -6; goto abort;
+		}
 	}
+
+
 
 abort:
 	if (res) { fprintf(stderr, "error %d: %s\n", res, strerror(errno)); }
@@ -206,6 +227,9 @@ int main (int argc, const char* argv[])
 	frame_t frames[2];
 
 	int L[DS_HEIGHT - 2][DS_WIDTH - 2];
+	int disimilar_frames = 0, similar_frames = 0;
+
+	hwd_gpio_set(PIN_WHEEL_SENSOR, 1);
 
 	for (unsigned int i = 0; 1; ++i)
 	{
@@ -216,7 +240,19 @@ int main (int argc, const char* argv[])
 
 		int diff = frame_diff(frames + 0, frames + 1);
 		//fprintf(stderr, "frame_diff: %d\n", diff);
-		if (diff < MIN_IMG_DIFF) { continue; }
+		if (diff < MIN_IMG_DIFF)
+		{
+			disimilar_frames = 0;
+			hwd_gpio_set(PIN_HEADLIGHT, 0);
+			continue;
+		}
+
+		disimilar_frames++;
+
+		if (disimilar_frames > 15)
+		{
+			hwd_gpio_set(PIN_HEADLIGHT, 1);
+		}
 
 		uint32_t is_ok = 0;
 		float mu = 0;
@@ -234,7 +270,7 @@ int main (int argc, const char* argv[])
 		}
 
 		request_classification(argv[1], &ds_frame, &is_ok);
-		hwd_gpio_set(4, is_ok);
+		hwd_gpio_set(PIN_WHEEL_SENSOR, is_ok);
 	}
 
 	return 0;
