@@ -24,14 +24,14 @@ last_frame_time = 0
 frames_received = 100
 positives_last_frame = 0
 force_training = False
-
+collecting_negs = False
 
 def has_cli_arg(arg_str):
     return arg_str in sys.argv
 
 
 def classify_req(sock):
-    global last_frame_time, frames_received, positives_last_frame
+    global last_frame_time, frames_received, positives_last_frame, collecting_negs
 
     start_time = time.time()
     log.info("got connection")
@@ -65,7 +65,6 @@ def classify_req(sock):
 
     # try:
     # do classification here
-    collecting_negs = has_cli_arg('collect') and has_cli_arg('negatives')
     collecting_pos = has_cli_arg('collect') and has_cli_arg('positives')
 
     if collecting_negs:
@@ -170,6 +169,11 @@ def force_train():
     force_training = True
     return redirect('/')
 
+@app.route('/collect-negatives')
+def collect_negatives():
+    global collecting_negs
+    collecting_negs = True
+    return redirect('/')
 
 @app.route('/unknown/next')
 def unknown_next():
@@ -215,7 +219,7 @@ if __name__ == '__main__':
 
     if has_cli_arg('collect') and has_cli_arg('negatives'):
         log.info('Collecting only negative examples')
-
+        collecting_negs = True
     try:
         classifier.load()
     except FileNotFoundError:
